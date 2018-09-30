@@ -17,12 +17,13 @@ def getNodes(request):
     return JsonResponse(result)
 
 def parseOptions(request):
-    neededFields = request.GET.getlist("neededFields[]", ["title", "content"])
+    neededFields = request.GET.getlist("neededFields[]", ["title", "type", "content"])
     ids = [int(x) for x in request.GET.getlist("ids[]")]
 
     options = {
         "include_id": True,
         "include_title": "title" in neededFields,
+        "include_type": "type" in neededFields,
         "include_content": "content" in neededFields,
         # TODO: error handling
         "parentlevels": int(request.GET.get("parentlevels", default=0)),
@@ -53,6 +54,7 @@ def serializeToJson(node, options):
     fields = {
         "id": node.id,
         "title": node.title,
+        "type": node.node_type,
         "content": node.content,
     }
 
