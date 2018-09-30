@@ -3,6 +3,32 @@ from django.shortcuts import render
 
 from xtreembackend.models import Node
 
+def createNode(request):
+    parentNodeId = int(request.GET.get("parentnodeid", None))
+    title = request.GET.get("title")
+    content = request.GET.get("content")
+    type = request.GET.get("type")
+
+    node = Node()
+    node.title = title
+    node.content = content
+    node.node_type = type
+
+    node.full_clean()
+    node.save()
+
+    if parentNodeId != None:
+        node.parents.add(parentNodeId)
+    node.full_clean()
+    node.save()
+
+    return JsonResponse({
+        "id": node.id,
+        "title": node.title,
+        "content": node.content,
+        "type": node.node_type,
+    })
+
 def getNodes(request):
     (ids, options) = parseOptions(request)
 
