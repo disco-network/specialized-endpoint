@@ -25,7 +25,9 @@ SECRET_KEY = 'bdg(*md!szk9$g%2%7v$wa_v27*tnvpz08gf7@m&+#7ba98#lj'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+	'xtreem.datokrat.sirius.uberspace.de'
+]
 
 
 # Application definition
@@ -115,6 +117,8 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+
+USE_X_FORWARDED_HOST = True
 
 
 # Static files (CSS, JavaScript, Images)
