@@ -1,9 +1,12 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 
 from xtreembackend.models import Node
 
 def createNode(request):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthenticated", 401)
+
     parentNodeId = int(request.GET.get("parentnodeid", None))
     title = request.GET.get("title")
     content = request.GET.get("content")
@@ -13,6 +16,7 @@ def createNode(request):
     node.title = title
     node.content = content
     node.node_type = type
+    node.author = request.user
 
     node.full_clean()
     node.save()
@@ -43,12 +47,13 @@ def getNodes(request):
     return JsonResponse(result)
 
 def parseOptions(request):
-    neededFields = request.GET.getlist("neededFields[]", ["title", "type", "content"])
+    neededFields = request.GET.getlist("neededFields[]", ["title", "type", "author", "content"])
     ids = [int(x) for x in request.GET.getlist("ids[]")]
 
     options = {
         "include_id": True,
         "include_title": "title" in neededFields,
+        "include_author": "author" in neededFields,
         "include_type": "type" in neededFields,
         "include_content": "content" in neededFields,
         # TODO: error handling
@@ -82,6 +87,7 @@ def serializeToJson(node, options):
         "title": node.title,
         "type": node.node_type,
         "content": node.content,
+        "author": node.author.id if node.author else None,
     }
 
     json = {
