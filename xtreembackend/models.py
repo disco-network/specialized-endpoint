@@ -16,7 +16,7 @@ class Node(models.Model):
     )
 
     title = models.CharField(max_length=255)
-    content = models.TextField(max_length=65535)
+    content = models.TextField(max_length=65535, blank=True)
     node_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="general")
     
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

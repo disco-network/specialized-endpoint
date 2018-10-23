@@ -33,6 +33,44 @@ def createNode(request):
         "type": node.node_type,
     })
 
+def deleteNode(request):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthenticated", 401)
+
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+    
+    if node.author != request.user:
+        return HttpResponse("Forbidden", 403)
+
+    node.delete()
+    return HttpResponse("No content", 204)
+
+def updateNode(request):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthenticated", 401)
+
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+
+    if node.author != request.user:
+        return HttpResponse("Forbidden", 403)
+
+    title = request.GET.get("title", None)
+    content = request.GET.get("content", None)
+    type = request.GET.get("type", None)
+
+    if title != None:
+        node.title = title
+    if content != None:
+        node.content = content
+    if type != None:
+        node.node_type = type
+
+    node.full_clean()
+    node.save()
+    return HttpResponse("No content", 204)
+
 def getNodes(request):
     (ids, options) = parseOptions(request)
 
