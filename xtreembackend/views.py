@@ -8,7 +8,7 @@ def createNode(request):
         return HttpResponse("Unauthenticated", 401)
 
     parentNodeId = int(request.GET.get("parentnodeid", None))
-    title = request.GET.get("title")
+    title = request.GET.get("name")
     content = request.GET.get("content")
     type = request.GET.get("type")
 
@@ -28,7 +28,7 @@ def createNode(request):
 
     return JsonResponse({
         "id": node.id,
-        "title": node.title,
+        "name": node.title,
         "content": node.content,
         "type": node.node_type,
     })
@@ -56,7 +56,7 @@ def updateNode(request):
     if node.author != request.user:
         return HttpResponse("Forbidden", 403)
 
-    title = request.GET.get("title", None)
+    title = request.GET.get("name", None)
     content = request.GET.get("content", None)
     type = request.GET.get("type", None)
 
@@ -85,12 +85,12 @@ def getNodes(request):
     return JsonResponse(result)
 
 def parseOptions(request):
-    neededFields = request.GET.getlist("neededFields[]", ["title", "type", "author", "content"])
+    neededFields = request.GET.getlist("neededFields[]", ["name", "type", "author", "content"])
     ids = [int(x) for x in request.GET.getlist("ids[]")]
 
     options = {
         "include_id": True,
-        "include_title": "title" in neededFields,
+        "include_title": "name" in neededFields,
         "include_author": "author" in neededFields,
         "include_type": "type" in neededFields,
         "include_content": "content" in neededFields,
@@ -122,7 +122,7 @@ def getNodesRec(id, nodes, parentdepth, childdepth):
 def serializeToJson(node, options):
     fields = {
         "id": node.id,
-        "title": node.title,
+        "name": node.title,
         "type": node.node_type,
         "content": node.content,
         "author": node.author.id if node.author else None,
