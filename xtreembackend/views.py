@@ -2,29 +2,48 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 
 from xtreembackend.models import Node
+from xtreembackend.forms import NodeCreationForm
 
 def createNode(request):
     if not request.user.is_authenticated:
         return HttpResponse("Unauthenticated", 401)
 
-    parentNodeId = int(request.GET.get("parentnodeid", None))
-    title = request.GET.get("name")
-    content = request.GET.get("content")
-    type = request.GET.get("type")
+#    parentNodeId = int(request.GET.get("parentnodeid", None))
+#    title = request.GET.get("name")
+#    content = request.GET.get("content")
+#    type = request.GET.get("type")
+#
+#    node = Node()
+#    node.title = title
+#    node.content = content
+#    node.node_type = type
+#    node.author = request.user
+#
+#    node.full_clean()
+#    node.save()
+#
+#    if parentNodeId != None:
+#        node.parents.add(parentNodeId)
+#    node.full_clean()
+#    node.save()
 
-    node = Node()
-    node.title = title
-    node.content = content
-    node.node_type = type
-    node.author = request.user
+    form = NodeCreationForm(request.GET)
+    if (form.is_valid()):
+        node = Node();
+        node.title = form.cleaned_data["name"]
+        node.content = form.cleaned_data["content"]
+        node.node_type = form.cleaned_data["type"]
+        node.author = request.user
+        node.full_clean()
+        node.save()
 
-    node.full_clean()
-    node.save()
+        if form.cleaned_data["parentnodeid"] != None:
+            node.parents.add(form.cleaned_data["parentnodeid"])
+            node.full_clean()
+            node.save()
 
-    if parentNodeId != None:
-        node.parents.add(parentNodeId)
-    node.full_clean()
-    node.save()
+    else:
+        return HttpResponse("Bad Request (invalid parameters)", 404)
 
     return JsonResponse({
         "id": node.id,
@@ -90,7 +109,7 @@ def parseOptions(request):
 
     options = {
         "include_id": True,
-        "include_title": "name" in neededFields,
+        "include_name": "name" in neededFields,
         "include_author": "author" in neededFields,
         "include_type": "type" in neededFields,
         "include_content": "content" in neededFields,
