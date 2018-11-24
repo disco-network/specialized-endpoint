@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 
@@ -5,9 +6,6 @@ from xtreembackend.models import Node
 from xtreembackend.forms import NodeCreationForm
 
 def createNode(request):
-    if not request.user.is_authenticated:
-        return HttpResponse("Unauthenticated", 401)
-
 #    parentNodeId = int(request.GET.get("parentnodeid", None))
 #    title = request.GET.get("name")
 #    content = request.GET.get("content")
@@ -33,7 +31,7 @@ def createNode(request):
         node.title = form.cleaned_data["name"]
         node.content = form.cleaned_data["content"]
         node.node_type = form.cleaned_data["type"]
-        node.author = request.user
+        node.author = User.objects.get(id=form.cleaned_data["authorid"])
         node.full_clean()
         node.save()
 
@@ -53,27 +51,15 @@ def createNode(request):
     })
 
 def deleteNode(request):
-    if not request.user.is_authenticated:
-        return HttpResponse("Unauthenticated", 401)
-
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)
     
-    if node.author != request.user:
-        return HttpResponse("Forbidden", 403)
-
     node.delete()
     return HttpResponse("No content", 204)
 
 def updateNode(request):
-    if not request.user.is_authenticated:
-        return HttpResponse("Unauthenticated", 401)
-
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)
-
-    if node.author != request.user:
-        return HttpResponse("Forbidden", 403)
 
     title = request.GET.get("name", None)
     content = request.GET.get("content", None)
