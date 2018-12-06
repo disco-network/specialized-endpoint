@@ -57,6 +57,16 @@ def deleteNode(request):
     node.delete()
     return HttpResponse("No content", 204)
 
+def deleteLink(request):
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+
+    parentId = int(request.GET.get("parentid", None))
+    parent = Node.objects.get(id=parentId)
+
+    node.parents.remove(parent)
+    return HttpResponse("No content", 204)
+
 def updateNode(request):
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)

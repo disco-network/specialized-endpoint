@@ -7,6 +7,7 @@ urlpatterns = [
     path("api/nodes/get", views.getNodes, name="getNodes"),
     path("api/nodes/create", views.createNode, name="createNode"),
     path("api/nodes/delete", views.deleteNode, name="deleteNode"),
+    path("api/nodes/deleteLink", views.deleteLink, name="deleteLink"),
     path("api/nodes/update", views.updateNode, name="updateNode"),
 ]
 
