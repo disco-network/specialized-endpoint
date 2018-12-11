@@ -41,7 +41,9 @@ def createNode(request):
             node.save()
 
     else:
-        return HttpResponse("Bad Request (invalid parameters)", 404)
+        response = HttpResponse()
+        response.status_code = 404
+        return response
 
     return JsonResponse({
         "id": node.id,
@@ -55,7 +57,9 @@ def deleteNode(request):
     node = Node.objects.get(id=nodeId)
     
     node.delete()
-    return HttpResponse("No content", 204)
+    response = HttpResponse()
+    response.status_code = 204
+    return response
 
 def deleteLink(request):
     nodeId = int(request.GET.get("id", None))
@@ -65,7 +69,9 @@ def deleteLink(request):
     parent = Node.objects.get(id=parentId)
 
     node.parents.remove(parent)
-    return HttpResponse("No content", 204)
+    response = HttpResponse()
+    response.status_code = 204
+    return response
 
 def updateNode(request):
     nodeId = int(request.GET.get("id", None))
@@ -84,7 +90,9 @@ def updateNode(request):
 
     node.full_clean()
     node.save()
-    return HttpResponse("No content", 204)
+    response = HttpResponse()
+    response.status_code = 204
+    return response
 
 def getNodes(request):
     (ids, options) = parseOptions(request)
