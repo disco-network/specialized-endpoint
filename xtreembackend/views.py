@@ -73,6 +73,56 @@ def deleteLink(request):
     response.status_code = 204
     return response
 
+def addLink(request):
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+
+    targetParentId = int(request.GET.get("targetparentid", None))
+    targetParent = Node.objects.get(id=targetParentId)
+
+    node.parents.add(targetParent)
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
+def moveLink(request):
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+
+    oldParentId = int(request.GET.get("oldparentid", None))
+    oldParent = Node.objects.get(id=oldParentId)
+    newParentId = int(request.GET.get("newparentid", None))
+    newParent = Node.objects.get(id=newParentId)
+
+    node.parents.remove(oldParent)
+    node.parents.add(newParent)
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
+def cloneNode(request):
+    nodeId = int(request.GET.get("id", None))
+    node = Node.objects.get(id=nodeId)
+
+    targetParentId = int(request.GET.get("targetparentid", None))
+    targetParent = Node.objects.get(id=targetParentId)
+
+    newNode = Node()
+    newNode.title = node.title
+    newNode.content = node.content
+    newNode.node_type = node.node_type
+    newNode.author = node.author
+    newNode.full_clean()
+    newNode.save()
+
+    newNode.parents.add(targetParent)
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
 def updateNode(request):
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)

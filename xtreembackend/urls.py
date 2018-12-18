@@ -9,5 +9,9 @@ urlpatterns = [
     path("api/nodes/delete", views.deleteNode, name="deleteNode"),
     path("api/nodes/deleteLink", views.deleteLink, name="deleteLink"),
     path("api/nodes/update", views.updateNode, name="updateNode"),
+
+    path("api/nodes/moveLink", views.moveLink, name="moveLink"),
+    path("api/nodes/cloneNode", views.cloneNode, name="cloneNode"),
+    path("api/nodes/addLink", views.addLink, name="addLink"),
 ]
 
