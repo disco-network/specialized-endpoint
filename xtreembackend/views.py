@@ -151,11 +151,11 @@ def getNodes(request):
     for id in ids:
         getNodesRec(id, nodes, options["parentlevels"], options["childlevels"])
 
-    result = {}
+    result = []
     for id in nodes:
         node = nodes[id]["node"]
-        result[id] = serializeToJson(node, options)
-    return JsonResponse(result)
+        result.append(serializeToJson(node, options))
+    return JsonResponse({ "nodes": result })
 
 def parseOptions(request):
     neededFields = request.GET.getlist("neededFields[]", ["name", "type", "author", "content"])
