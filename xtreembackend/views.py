@@ -147,13 +147,12 @@ def updateNode(request):
 def getNodes(request):
     (ids, options) = parseOptions(request)
 
-    nodes = {}
+    nodes = []
     for id in ids:
         getNodesRec(id, nodes, options["parentlevels"], options["childlevels"])
 
     result = []
-    for id in nodes:
-        node = nodes[id]["node"]
+    for node in nodes:
         result.append(serializeToJson(node, options))
     return JsonResponse({ "nodes": result })
 
@@ -175,21 +174,15 @@ def parseOptions(request):
     return (ids, options)
 
 def getNodesRec(id, nodes, parentdepth, childdepth):
-    if not id in nodes:
-        nodes[id] = {
-            "node": Node.objects.get(id=id),
-            "childdepth": 0,
-            "parentdepth": 0
-        }
+    node = Node.objects.get(id=id)
+    nodes.append(node)
 
-    if nodes[id]["childdepth"] < childdepth:
-        nodes[id]["childdepth"] = childdepth
-        for child in nodes[id]["node"].children.all():
+    if childdepth > 0:
+        for child in node.children.all():
             getNodesRec(child.id, nodes, 0, childdepth - 1)
 
-    if nodes[id]["parentdepth"] < parentdepth:
-        nodes[id]["parentdepth"] = parentdepth
-        for parent in nodes[id]["node"].parents.all():
+    if parentdepth > 0:
+        for parent in node.parents.all():
             getNodesRec(parent.id, nodes, parentdepth - 1, 0)
 
 def serializeToJson(node, options):
