@@ -32,5 +32,6 @@ class Link(models.Model):
     deleted = models.BooleanField(default=False)
 
     class Meta:
+        db_table = "xtreembackend_node_x_link"
         unique_together = ('referrer', 'referree')
 
