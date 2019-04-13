@@ -20,8 +20,17 @@ class Node(models.Model):
     node_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="general")
     
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    parents = models.ManyToManyField("self", related_name="children", symmetrical=False, blank=True)
+    parents = models.ManyToManyField("self", related_name="children", symmetrical=False, blank=True, through="Link")
 
     def __str__(self):
         return self.title
+
+class Link(models.Model):
+    referrer = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="refersTo")
+    referree = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="referredFrom")
+
+    deleted = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('referrer', 'referree')
 
