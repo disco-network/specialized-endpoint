@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 
-from xtreembackend.models import Node
+from xtreembackend.models import Node, Link
 from xtreembackend.forms import NodeCreationForm
 
 def createNode(request):
@@ -63,12 +63,18 @@ def deleteNode(request):
 
 def deleteLink(request):
     nodeId = int(request.GET.get("id", None))
-    node = Node.objects.get(id=nodeId)
+#    node = Node.objects.get(id=nodeId)
 
     parentId = int(request.GET.get("parentid", None))
-    parent = Node.objects.get(id=parentId)
+#    parent = Node.objects.get(id=parentId)
 
-    node.parents.remove(parent)
+#    node.parents.remove(parent)
+
+    link = Link.objects.get(from_node=parentId, to_node=nodeId)
+    link.deleted = True
+    link.full_clean()
+    link.save()
+
     response = HttpResponse()
     response.status_code = 204
     return response
@@ -149,7 +155,7 @@ def getNodes(request):
 
     nodes = []
     for id in ids:
-        getNodesRec(id, nodes, options["parentlevels"], options["childlevels"])
+        getNodesRec(id, nodes, options["parentlevels"], options["childlevels"], options["show_deleted"])
 
     result = []
     for node in nodes:
@@ -158,6 +164,7 @@ def getNodes(request):
 
 def parseOptions(request):
     neededFields = request.GET.getlist("neededFields[]", ["name", "type", "author", "content"])
+    showDeleted = request.GET.get("showDeleted", 0)
     ids = [int(x) for x in request.GET.getlist("ids[]")]
 
     options = {
@@ -166,6 +173,7 @@ def parseOptions(request):
         "include_author": "author" in neededFields,
         "include_type": "type" in neededFields,
         "include_content": "content" in neededFields,
+        "show_deleted": showDeleted == "1",
         # TODO: error handling
         "parentlevels": int(request.GET.get("parentlevels", default=0)),
         "childlevels": int(request.GET.get("childlevels", default=0)),
@@ -173,17 +181,21 @@ def parseOptions(request):
 
     return (ids, options)
 
-def getNodesRec(id, nodes, parentdepth, childdepth):
+def getNodesRec(id, nodes, parentdepth, childdepth, showDeleted):
     node = Node.objects.get(id=id)
     nodes.append(node)
 
     if childdepth > 0:
-        for child in node.children.all():
-            getNodesRec(child.id, nodes, 0, childdepth - 1)
+        for link in node.refersTo.all():
+            child = link.referree
+            if (not link.deleted) or showDeleted:
+                getNodesRec(child.id, nodes, 0, childdepth - 1, showDeleted)
 
     if parentdepth > 0:
-        for parent in node.parents.all():
-            getNodesRec(parent.id, nodes, parentdepth - 1, 0)
+        for link in node.referredFrom.all():
+            parent = link.referrer
+            if (not link.deleted) or showDeleted:
+                getNodesRec(parent.id, nodes, parentdepth - 1, 0, showDeleted)
 
 def serializeToJson(node, options):
     fields = {
@@ -194,9 +206,10 @@ def serializeToJson(node, options):
         "author": node.author.id if node.author else None,
     }
 
+    showDeleted = options["show_deleted"]
     json = {
-        "parents": [parent.id for parent in node.parents.all()],
-        "children": [child.id for child in node.children.all()],
+        "parents": [link.from_node.id for link in (node.referredFrom.all() if showDeleted else node.referredFrom.filter(deleted=False).all())],
+        "children": [link.to_node.id for link in (node.refersTo.all() if showDeleted else node.refersTo.filter(deleted=False).all())],
     }
 
     for key in fields:

@@ -26,12 +26,12 @@ class Node(models.Model):
         return self.title
 
 class Link(models.Model):
-    referrer = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="refersTo")
-    referree = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="referredFrom")
+    to_node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="referredFrom")
+    from_node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="refersTo")
 
     deleted = models.BooleanField(default=False)
 
     class Meta:
         db_table = "xtreembackend_node_x_link"
-        unique_together = ('referrer', 'referree')
+        unique_together = ('to_node', 'from_node')
 
