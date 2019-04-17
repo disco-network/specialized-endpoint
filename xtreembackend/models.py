@@ -22,6 +22,16 @@ class Node(models.Model):
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     parents = models.ManyToManyField("self", related_name="children", symmetrical=False, blank=True, through="Link")
 
+    def addParent(self, parentId):
+        if not Link.objects.filter(from_node_id=parentId, to_node_id=self.id).exists():
+            link = Link(from_node_id=parentId, to_node_id=self.id)
+            link.full_clean()
+            link.save()
+        else:
+            link = Link.objects.get(from_node_id=parentId, to_node_id=self.id)
+            link.deleted = False
+            link.save()
+
     def __str__(self):
         return self.title
 

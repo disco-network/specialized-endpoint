@@ -36,9 +36,10 @@ def createNode(request):
         node.save()
 
         if form.cleaned_data["parentnodeid"] != None:
-            node.parents.add(form.cleaned_data["parentnodeid"])
-            node.full_clean()
-            node.save()
+            node.addParent(form.cleaned_data["parentnodeid"])
+#            link = Link(from_node_id=form.cleaned_data["parentnodeid"], to_node_id=node.id)
+#            link.full_clean()
+#            link.save()
 
     else:
         response = HttpResponse()
@@ -84,9 +85,8 @@ def addLink(request):
     node = Node.objects.get(id=nodeId)
 
     targetParentId = int(request.GET.get("targetparentid", None))
-    targetParent = Node.objects.get(id=targetParentId)
 
-    node.parents.add(targetParent)
+    node.addParent(targetParentId)
 
     response = HttpResponse()
     response.status_code = 204
@@ -95,14 +95,13 @@ def addLink(request):
 def moveLink(request):
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)
-
     oldParentId = int(request.GET.get("oldparentid", None))
-    oldParent = Node.objects.get(id=oldParentId)
     newParentId = int(request.GET.get("newparentid", None))
-    newParent = Node.objects.get(id=newParentId)
 
-    node.parents.remove(oldParent)
-    node.parents.add(newParent)
+    node.addParent(newParentId)
+
+    oldLink = Link.objects.get(from_node_id=oldParentId, to_node_id=nodeId)
+    oldLink.delete()
 
     response = HttpResponse()
     response.status_code = 204
@@ -123,7 +122,7 @@ def cloneNode(request):
     newNode.full_clean()
     newNode.save()
 
-    newNode.parents.add(targetParent)
+    newNode.addParent(targetParentId)
 
     response = HttpResponse()
     response.status_code = 204
