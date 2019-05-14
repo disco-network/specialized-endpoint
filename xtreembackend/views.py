@@ -186,14 +186,14 @@ def getNodesRec(id, nodes, parentdepth, childdepth, showDeleted):
 
     if childdepth > 0:
         for link in node.refersTo.all():
-            child = link.referree
-            if (not link.deleted) or showDeleted:
+            child = link.to_node
+            if not link.deleted:
                 getNodesRec(child.id, nodes, 0, childdepth - 1, showDeleted)
 
     if parentdepth > 0:
         for link in node.referredFrom.all():
-            parent = link.referrer
-            if (not link.deleted) or showDeleted:
+            parent = link.from_node
+            if not link.deleted:
                 getNodesRec(parent.id, nodes, parentdepth - 1, 0, showDeleted)
 
 def serializeToJson(node, options):
@@ -205,11 +205,15 @@ def serializeToJson(node, options):
         "author": node.author.id if node.author else None,
     }
 
-    showDeleted = options["show_deleted"]
     json = {
-        "parents": [link.from_node.id for link in (node.referredFrom.all() if showDeleted else node.referredFrom.filter(deleted=False).all())],
-        "children": [link.to_node.id for link in (node.refersTo.all() if showDeleted else node.refersTo.filter(deleted=False).all())],
+        "parents": [link.from_node.id for link in node.referredFrom.filter(deleted=False).all()],
+        "children": [link.to_node.id for link in node.refersTo.filter(deleted=False).all()],
     }
+
+    showDeleted = options["show_deleted"]
+    if showDeleted:
+        json["del_parents"] = [link.from_node.id for link in node.referredFrom.filter(deleted=True).all()];
+        json["del_children"] = [link.to_node.id for link in node.refersTo.filter(deleted=True).all()];
 
     for key in fields:
         option = "include_" + key
