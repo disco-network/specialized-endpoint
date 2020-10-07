@@ -62,6 +62,19 @@ def deleteNode(request):
     response.status_code = 204
     return response
 
+def deleteLinks(request):
+    ids = [int(x) for x in request.GET.getlist("ids[]", [])]
+    pids = [int(x) for x in request.GET.getlist("pids[]", [])]
+    for (id, pid) in zip(ids, pids):
+        link = Link.objects.get(from_node=pid, to_node=id)
+        link.deleted = True
+        link.full_clean()
+        link.save()
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
 def deleteLink(request):
     nodeId = int(request.GET.get("id", None))
 #    node = Node.objects.get(id=nodeId)
@@ -92,6 +105,18 @@ def addLink(request):
     response.status_code = 204
     return response
 
+def addLinks(request):
+    ids = [int(x) for x in request.GET.getlist("ids[]", [])]
+    pids = [int(x) for x in request.GET.getlist("pids[]", [])]
+
+    for (id, pid) in zip(ids, pids):
+        node = Node.objects.get(id=id)
+        node.addParent(pid)
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
 def moveLink(request):
     nodeId = int(request.GET.get("id", None))
     node = Node.objects.get(id=nodeId)
@@ -102,6 +127,45 @@ def moveLink(request):
 
     oldLink = Link.objects.get(from_node_id=oldParentId, to_node_id=nodeId)
     oldLink.delete()
+
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
+def moveLinks(request):
+    ids = [int(x) for x in request.GET.getlist("ids[]", [])]
+    opids = [int(x) for x in request.GET.getlist("opids[]", [])]
+    npids = [int(x) for x in request.GET.getlist("npids[]", [])]
+    if len(ids) > 100 or len(ids) != len(opids) or len(ids) != len(npids):
+        response = HttpResponse()
+        response.status_code = 400
+        return response
+    
+    for (id, opid, npid) in zip(ids, opids, npids):
+        node = Node.objects.get(id=id);
+        Link.objects.get(from_node_id=opid, to_node_id=id).delete()
+        node.addParent(npid)
+        
+    response = HttpResponse()
+    response.status_code = 204
+    return response
+
+def cloneNodes(request):
+    ids = [int(x) for x in request.GET.getlist("ids[]", [])]
+    pids = [int(x) for x in request.GET.getlist("pids[]", [])]
+
+    for (id, pid) in zip(ids, pids):
+        node = Node.objects.get(id=id)
+        parent = Node.objects.get(id=pid)
+        newNode = Node()
+        newNode.title = node.title
+        newNode.content = node.content
+        newNode.node_type = node.node_type
+        newNode.author = node.author
+        newNode.full_clean()
+        newNode.save()
+
+        newNode.addParent(pid)
 
     response = HttpResponse()
     response.status_code = 204
@@ -152,14 +216,10 @@ def updateNode(request):
 def getNodes(request):
     (ids, options) = parseOptions(request)
 
-    nodes = []
-    for id in ids:
-        getNodesRec(id, nodes, options["parentlevels"], options["childlevels"], options["show_deleted"])
+    nodes = {}
+    getNodesRec2(ids, nodes, options["parentlevels"], options["childlevels"], options["show_deleted"], options)
 
-    result = []
-    for node in nodes:
-        result.append(serializeToJson(node, options))
-    return JsonResponse({ "nodes": result })
+    return JsonResponse({ "nodes": nodes })
 
 def parseOptions(request):
     neededFields = request.GET.getlist("neededFields[]", ["name", "type", "author", "content"])
@@ -180,40 +240,64 @@ def parseOptions(request):
 
     return (ids, options)
 
-def getNodesRec(id, nodes, parentdepth, childdepth, showDeleted):
+def getNodesRec2(ids, nodes, parentdepth, childdepth, showDeleted, options):
+    query_ids = [id for id in ids if not (id in nodes)]
+    extend_ids = set([id for id in ids if id in nodes and nodes[id]["child_depth"] < childdepth])
+
+    retrieved = Node.objects.prefetch_related("refersTo", "referredFrom").filter(id__in=query_ids).all()
+    unknowns = set()
+    for node in retrieved:
+        serialized = serializeToJson(node, options)
+        nodes[str(node.id)] = serialized
+
+        serialized["children"] = [str(link.to_node.id) for link in node.refersTo.all() if not link.deleted]
+        if options["show_deleted"]:
+            serialized["del_children"] = [str(link.to_node.id) for link in node.refersTo.all() if link.deleted ];
+
+        extend_ids.add(str(node.id))
+
+    for id in extend_ids:
+        node = nodes[id]
+        node["child_depth"] = childdepth
+        if childdepth > 0:
+            node["children_included"] = True
+            for childId in node["children"]:
+                if not (childId in nodes) and not (childId in ids):
+                    unknowns.add(childId)
+    
+            if options["show_deleted"]:
+                for childId in serialized["del_children"]:
+                    if not (childId in nodes) and not (childId in ids):
+                        unknowns.add(childId)
+
+    if len(unknowns) > 0:
+        getNodesRec2(unknowns, nodes, 0, childdepth - 1, showDeleted, options)
+
+def getNodesRec(id, nodes, parentdepth, childdepth, showDeleted, options):
     node = Node.objects.get(id=id)
-    nodes.append(node)
+    serialized = serializeToJson(node, options)
+    nodes.append(serialized)
 
     if childdepth > 0:
-        for link in node.refersTo.all():
-            child = link.to_node
-            if not link.deleted:
-                getNodesRec(child.id, nodes, 0, childdepth - 1, showDeleted)
+        for child_id in serialized["children"]:
+            getNodesRec(child_id, nodes, 0, childdepth - 1, showDeleted, options)
 
     if parentdepth > 0:
         for link in node.referredFrom.all():
             parent = link.from_node
             if not link.deleted:
-                getNodesRec(parent.id, nodes, parentdepth - 1, 0, showDeleted)
+                getNodesRec(parent.id, nodes, parentdepth - 1, 0, showDeleted, options)
 
 def serializeToJson(node, options):
     fields = {
-        "id": node.id,
+        "id": str(node.id),
         "name": node.title,
         "type": node.node_type,
         "content": node.content,
-        "author": node.author.id if node.author else None,
+        "author": str(node.author.id) if node.author else None,
     }
 
-    json = {
-        "parents": [link.from_node.id for link in node.referredFrom.filter(deleted=False).all()],
-        "children": [link.to_node.id for link in node.refersTo.filter(deleted=False).all()],
-    }
-
-    showDeleted = options["show_deleted"]
-    if showDeleted:
-        json["del_parents"] = [link.from_node.id for link in node.referredFrom.filter(deleted=True).all()];
-        json["del_children"] = [link.to_node.id for link in node.refersTo.filter(deleted=True).all()];
+    json = {}
 
     for key in fields:
         option = "include_" + key
