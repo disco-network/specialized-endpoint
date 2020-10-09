@@ -18,8 +18,7 @@ class Node(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField(max_length=65535, blank=True)
     node_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default="general")
-    
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
     parents = models.ManyToManyField("self", related_name="children", symmetrical=False, blank=True, through="Link")
 
     def addParent(self, parentId):
@@ -36,6 +35,13 @@ class Node(models.Model):
         return self.title
 
 class Link(models.Model):
+    TYPE_CHOICES = (
+        ("general", "general"),
+        ("pro_arg", "pro_arg"),
+        ("con_arg", "con_arg"),
+    )
+
+    type = models.CharField(max_length=20, default="general", choices=TYPE_CHOICES)
     to_node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="referredFrom")
     from_node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name="refersTo")
 
@@ -43,5 +49,5 @@ class Link(models.Model):
 
     class Meta:
         db_table = "xtreembackend_node_x_link"
-        unique_together = ('to_node', 'from_node')
+        unique_together = ('type', 'to_node', 'from_node')
 
