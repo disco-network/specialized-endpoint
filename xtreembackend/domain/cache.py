@@ -1,10 +1,10 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from .objects import Node, Link
 from .validation import ValidationException, isDictOf, isListOf
 
 class Cache:
-    nodesById: Dict[int, Node]
-    childrenByParentId: Dict[int, List[Link]]
+    nodesById: Dict[int, Any]
+    childrenByParentId: Dict[int, List[Any]]
 
     @staticmethod
     def make(**kwargs):
@@ -17,7 +17,7 @@ class Cache:
         if cache.isValid():
             return cache
         else:
-            raise ValidationException
+            raise ValidationException()
 
     def isValid(self):
         def fst(kv):
@@ -52,7 +52,7 @@ class Cache:
     def getNode(self, nodeId):
         return self.nodesById[nodeId] if self.hasNode(nodeId) else None
 
-    def storeChildren(self, nodeId: int, children: List[Link]):
+    def storeChildren(self, nodeId: int, children):
         self.childrenByParentId[nodeId] = children
 
     def hasChildrenOf(self, nodeId):

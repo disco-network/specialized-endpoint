@@ -1,4 +1,4 @@
-from .objects import Node, NodeData, NodeService, Link, Guard
+from .objects import Node, NodeData, Link
 from .cache import Cache
 
 class NodeSerializationService:

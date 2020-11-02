@@ -1,10 +1,10 @@
 from typing import List
 
 from .models import Node as DBNode, Link as DBLink
-from .domain.objects import Node, NodeType, NodeData, NodeService, Link, LinkType, LinkService
+from .domain.objects import Node, NodeType, NodeData, Link, LinkType
 
 class NodeRepository:
-    def get(self, ids: List[int]) -> List[Node]:
+    def get(self, ids: List[int]):
         query = DBNode.objects.filter(id__in=ids)
         nodesById = {}
         for id in ids:
@@ -13,7 +13,7 @@ class NodeRepository:
             nodesById[dbNode.id] = self._toDomainNode(dbNode)
         return nodesById
 
-    def getChildren(self, ids: List[int]) -> List[List[Link]]:
+    def getChildren(self, ids: List[int]):
         query = DBLink.objects.filter(from_node_id__in=ids)
         linksByParentId = {}
         for id in ids:
@@ -22,18 +22,17 @@ class NodeRepository:
             linksByParentId[dbLink.from_node_id].append(self._toDomainLink(dbLink))
         return linksByParentId
 
-    def create(self, data: NodeData) -> Node:
-        dbNode = DBNode(title=data.title, content=data.content, node_type=data.type.value)
+    def create(self, data):
+        dbNode = DBNode(title=data["title"], content=data["content"], node_type=data["type"])
         dbNode.full_clean()
         dbNode.save()
 
-        node = NodeService.make(id=dbNode.id, data=data)
-        return node
+        return self._toDomainNode(dbNode)
 
     def link(self, link: Link):
         query = self._linkToQuery(link)
         if not query.exists():
-            dbLink = DBLink(from_node_id=link.sourceId, to_node_id=link.targetId, type=link.type.value)
+            dbLink = DBLink(from_node_id=link["sourceId"], to_node_id=link["targetId"], type=link["type"])
             dbLink.full_clean()
             dbLink.save()
         else:
@@ -47,29 +46,49 @@ class NodeRepository:
             dbLink = query.get()
             dbLink.deleted = True
 
-    def update(self, id: int, data: NodeData) -> Node:
+    def update(self, id: int, data) -> Node:
         query = DBNode.objects.filter(id=id)
         if query.exists():
             node = query.get()
-            node.title = data.title
-            node.content = data.content
-            node.node_type = data.type.value
+            node.title = data["title"]
+            node.content = data["content"]
+            node.node_type = data["type"]
             node.full_clean()
             node.save()
-
-            return NodeService.make(id=id, data=data)
+            return self._toDomainNode(node)
         else:
             raise NodeNotFoundException()
 
     def _linkToQuery(self, link: Link):
-        return DBLink.objects.filter(from_node_id=link.sourceId, to_node_id=link.targetId, type=link.type.value)
+        return DBLink.objects.filter(from_node_id=link["sourceId"], to_node_id=link["targetId"], type=link["type"])
 
     def _toDomainNode(self, dbNode: DBNode) -> Node:
-        data = NodeService.makeData(title=dbNode.title, content=dbNode.content, type=NodeType(dbNode.node_type))
-        return NodeService.make(id=dbNode.id, data=data)
+        creationResult = Node.create({
+            "id": id,
+            "data": {
+                "title": dbNode.title,
+                "content": dbNode.content,
+                "type": dbNode.node_type,
+            },
+        })
+
+        if not creationResult.isOk():
+            raise ValidationException(creationResult.extract())
+        else:
+            return creationResult.extract()
 
     def _toDomainLink(self, dbLink: DBLink) -> Link:
-        return LinkService.make(id=dbLink.id, sourceId=dbLink.from_node_id, targetId=dbLink.to_node_id, type=LinkType(dbLink.type))
+        creationResult = Link.create({
+            "id": dbLink.id,
+            "sourceId": dbLink.from_node_id,
+            "targetId": dbLink.to_node_id,
+            "type": dbLink.type,
+        })
+
+        if not creationResult.isOk():
+            raise ValidationException(creationResult.extract())
+        else:
+            return creationResult.extract()
 
 class NodeNotFoundException(Exception):
     pass

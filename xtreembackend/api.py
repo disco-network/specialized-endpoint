@@ -6,267 +6,109 @@ from .domain.validation import Guard, ValidationException, isListOf
 from .domain.serialization import NodeSerializationService, LinkSerializationService
 from .domain.cache import Cache
 
-class GetNodesCommand:
-    ids: List[int]
-    depth: int
+from .domain.dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable
 
-    def isValid(self):
-        return isListOf(self.ids, lambda id: isinstance(id, int)) and \
-            isinstance(self.depth, int) and \
-            self.depth <= 10
+GetNodesCommand = AggregateDataType({
+    "ids": ListDataType(IntDataType),
+    "depth": IntDataType,
+}, lambda cmd: Result.ensure([
+    (cmd["depth"] >= 0, "The depth must be nonnegative"),
+    (cmd["depth"] <= 10, "The depth must be at most 10"),
+]))
 
-    def execute(self, repository: NodeRepository) -> Cache:
-        cache = Cache.make()
-        depthOfLevel = self.depth
-        nodeCount = 0
-        idsOnLevel = None
+def executeGetNodesCommand(cmd, repository):
+    cache = Cache.make()
+    depthOfLevel = cmd["depth"]
+    nodeCount = 0
+    idsOnLevel = None
 
-        def assignIdsForNextLevel(ids):
-            nonlocal nodeCount, depthOfLevel, idsOnLevel
-            if nodeCount + len(ids) >= 2000:
-                depthOfLevel = 0
-                idsOnLevel = ids[0:2000-nodeCount]
-            else:
-                idsOnLevel = ids
-            nodeCount += len(idsOnLevel)
-        assignIdsForNextLevel(self.ids)
-
-        while depthOfLevel >= 0:
-            newIdsOnLevel = [id for id in idsOnLevel if not cache.hasNode(id)]
-            newNodesOnLevel = repository.get(newIdsOnLevel)
-            for (id, node) in newNodesOnLevel.items():
-                cache.storeNode(node)
-
-            depthOfLevel -= 1
-            if depthOfLevel >= 0:
-                idsWithUnknownChildrenOnLevel = [id for id in idsOnLevel if not cache.hasChildrenOf(id)]
-                for (id, children) in repository.getChildren(idsWithUnknownChildrenOnLevel).items():
-                    cache.storeChildren(id, children)
-
-                assignIdsForNextLevel([link.targetId for parentId in idsOnLevel for link in cache.getChildrenOf(parentId)])
-
-        return cache
-
-    # private
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
-
-    @staticmethod
-    def make(**kwargs) -> "GetNodesCommand":
-        cmd = GetNodesCommand(ids=Guard.access(kwargs, "ids"), depth=Guard.access(kwargs, "depth"))
-
-        if cmd.isValid():
-            return cmd
+    def assignIdsForNextLevel(ids):
+        nonlocal nodeCount, depthOfLevel, idsOnLevel
+        if nodeCount + len(ids) >= 2000:
+            depthOfLevel = 0
+            idsOnLevel = ids[0:2000-nodeCount]
         else:
-            raise ValidationException()
+            idsOnLevel = ids
+        nodeCount += len(idsOnLevel)
+    assignIdsForNextLevel(cmd["ids"])
 
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "ids": cmd.ids,
-        }
+    while depthOfLevel >= 0:
+        newIdsOnLevel = [id for id in idsOnLevel if not cache.hasNode(id)]
+        newNodesOnLevel = repository.get(newIdsOnLevel)
+        for (id, node) in newNodesOnLevel.items():
+            cache.storeNode(node)
 
-    @staticmethod
-    def deserialize(raw) -> "GetNodesCommand":
-        return GetNodesCommand.make(**raw)
+        depthOfLevel -= 1
+        if depthOfLevel >= 0:
+            idsWithUnknownChildrenOnLevel = [id for id in idsOnLevel if not cache.hasChildrenOf(id)]
+            for (id, children) in repository.getChildren(idsWithUnknownChildrenOnLevel).items():
+                cache.storeChildren(id, children)
 
-class CreateNodeCommand:
-    nodeData: NodeData
-    parentId: int # nullable
+            assignIdsForNextLevel([link["targetId"] for parentId in idsOnLevel for link in cache.getChildrenOf(parentId)])
 
-    def isValid(self):
-        return isinstance(self.nodeData, NodeData) and \
-            (self.parentId == None or isinstance(self.parentId, int))
+    return cache
 
-    def execute(self, repository: NodeRepository) -> Node:
-        node = repository.create(self.nodeData)
 
-        if self.parentId != None:
-            repository.link(Link(sourceId=self.parentId, targetId=node.id, type=LinkType.GENERAL))
+CreateNodeCommand = AggregateDataType({
+    "nodeData": NodeData,
+    "parentId": Nullable(IntDataType),
+}, lambda cmd: Result.success(None))
 
-        return node
+def executeCreateNodeCommand(cmd, repository: NodeRepository) -> Node:
+    node = repository.create(cmd["nodeData"])
 
-    # private
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
+    if cmd["parentId"].hasValue():
+        repository.link(Link.create({
+            "sourceId": cmd["parentId"],
+            "targetId": node["id"],
+            "type": "general"
+        }))
 
-    @staticmethod
-    def make(**kwargs) -> "CreateNodeCommand":
-        cmd = CreateNodeCommand(
-            nodeData=Guard.access(kwargs, "nodeData"),
-            parentId=Guard.access(kwargs, "parentId"))
+    return node
 
-        if cmd.isValid():
-            return cmd
-        else:
-            raise ValidationException()
+LinkCommand = AggregateDataType({
+    "links": ListDataType(Link),
+}, lambda data: Result.ensure([
+    (len(data["links"]) <= 100, "The number of links given must not be higher than 100."),
+]))
 
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "nodeData": cmd.nodeData,
-            "parentId": cmd.parentId,
-        }
+def executeLinkCommand(cmd, repository: NodeRepository):
+    for link in cmd["links"]:
+        repository.link(link)
 
-    @staticmethod
-    def deserialize(raw):
-        return CreateNodeCommand.make(**raw)
+UnlinkCommand = AggregateDataType({
+    "links": ListDataType(Link),
+}, lambda data: Result.ensure([
+    (len(data["links"]) <= 100, "The number of links given must not be higher than 100."),
+]))
 
-class LinkCommand:
-    links: List[Link]
+def executeUnlinkCommand(cmd, repository: NodeRepository):
+    for link in cmd["links"]:
+        repository.unlink(link)
 
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
+MoveCommand = AggregateDataType({
+    "oldLinks": ListDataType(Link),
+    "newLinks": ListDataType(Link),
+}, lambda data: Result.ensure([
+    (len(data["oldLinks"]) + len(data["newLinks"]) <= 200, "The total number of links given must not be higher than 200."),
+]))
 
-    def isValid(self):
-        return isListOf(self.links, lambda item: isinstance(item, Link)) and \
-            len(self.links) <= 100
+def executeMoveCommand(cmd, repository: NodeRepository):
+    unlinkCmd = UnlinkCommand.create({
+        "links": ListDataType(Link).serialize(cmd["oldLinks"]),
+    })
+    linkCmd = LinkCommand.create({
+        "links": ListDataType(Link).serialize(cmd["newLinks"]),
+    })
 
-    def execute(self, repository: NodeRepository):
-        for link in self.links:
-            repository.link(link)
+    executeUnlinkCommand(unlinkCmd, repository)
+    executeLinkCommand(linkCmd, repository)
 
-    @staticmethod
-    def make(**kwargs) -> "LinkCommand":
-        cmd = LinkCommand(
-            links=Guard.access(kwargs, "links"))
+UpdateNodeDataCommand = AggregateDataType({
+    "id": IntDataType,
+    "data": NodeData,
+}, lambda data: Result.success(None))
 
-        if cmd.isValid():
-            return cmd
-        else:
-            raise ValidationException()
+def executeUpdateNodeDataCommand(cmd, repository: NodeRepository):
+    repository.update(cmd["id"], cmd["data"])
 
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "links": map(lambda link: LinkSerializationService.serialize(link), self.links)
-        }
-
-    @staticmethod
-    def deserialize(raw) -> "LinkCommand":
-        rawLinks = Guard.access(raw["links"])
-        if isinstance(rawLinks, list):
-            links = map(lambda raw: LinkSerializationService.deserialize(raw), rawLinks)
-            return LinkCommand.make(links=links)
-
-class UnlinkCommand:
-    links: List[Link]
-
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
-
-    def isValid(self):
-        return isListOf(self.links, lambda item: isinstance(item, Link)) and \
-            len(self.links) <= 100
-
-    def execute(self, repository: NodeRepository):
-        for link in self.links:
-            repository.unlink(link)
-
-    @staticmethod
-    def make(**kwargs) -> "UnlinkCommand":
-        cmd = LinkCommand(
-            links=Guard.access(kwargs, "links"))
-
-        if cmd.isValid():
-            return cmd
-        else:
-            raise ValidationException()
-
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "links": map(lambda link: LinkSerializationService.serialize(link), cmd.links)
-        }
-
-    @staticmethod
-    def deserialize(raw) -> "LinkCommand":
-        rawLinks = Guard.access(raw, "links")
-        if isinstance(rawLinks, list):
-            links = map(lambda raw: LinkSerializationService.deserialize(raw), rawLinks)
-            return LinkCommand.make(links=links)
-
-class MoveCommand:
-    oldLinks: List[Link]
-    newLinks: List[Link]
-
-    def __init__(**attributes):
-        self.__dict__.update(attributes)
-
-    def isValid(self):
-        return isListOf(self.oldLinks, lambda item: isinstance(item, Link)) and \
-            isListOf(self.newLinks, lambda item: isinstance(item, Link)) and \
-            len(self.oldLinks) + len(self.newLinks) <= 200
-
-    def execute(self, repository: NodeRepository):
-        unlinkCmd = UnlinkCommand.make(links=self.oldLinks)
-        linkCmd = LinkCommand.make(links=self.newLinks)
-
-        unlinkCmd.execute()
-        linkCmd.execute()
-
-    @staticmethod
-    def make(**kwargs) -> "MoveCommand":
-        cmd = MoveCommand(
-            oldLinks=Guard.access(kwargs, "oldLinks"),
-            newLinks=Guard.access(kwargs, "newLinks"))
-
-        if cmd.isValid:
-            return cmd
-        else:
-            raise ValidationException()
-
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "oldLinks": map(lambda link: LinkSerializationService.serialize(link), cmd.oldLinks),
-            "newLinks": map(lambda link: LinkSerializationService.serialize(link), cmd.newLinks),
-        }
-
-    @staticmethod
-    def deserialize(raw) -> "MoveCommand":
-        rawOldLinks = Guard.access(raw, "oldLinks")
-        rawNewLinks = Guard.access(raw, "newLinks")
-        if isinstance(rawOldLinks, list) and isinstance(rawNewLinks, list):
-            oldLinks = map(lambda raw: LinkSerializationService.deserialize(raw), rawOldLinks)
-            newLinks = map(lambda raw: LinkSerializationService.deserialize(raw), rawNewLinks)
-            return MoveCommand.make(oldLinks=oldLinks, newLinks=newLinks)
-        else:
-            raise ValidationException()
-
-class UpdateNodeDataCommand:
-    id: int
-    data: NodeData
-
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
-
-    def isValid(self):
-        return isinstance(self.id, int) and \
-            isinstance(self.data, NodeData)
-
-    def execute(self, repository: NodeRepository):
-        repository.update(self.id, self.data)
-
-    @staticmethod
-    def make(**kwargs) -> "UpdateNodeDataCommand":
-        cmd = UpdateNodeDataCommand(
-            id=id, data=Guard.access(kwargs, "data"))
-
-        if cmd.isValid():
-            return cmd
-        else:
-            raise ValidationException()
-
-    @staticmethod
-    def serialize(cmd):
-        return {
-            "id": cmd.id,
-            "data": cmd.data,
-        }
-
-    @staticmethod
-    def deserialize(raw) -> "UpdateNodeDataCommand":
-        return UpdateNodeDataCommand.make(
-            id=Guard.access(raw, "id"),
-            data=NodeSerializationService.deserialize(Guard.access(raw, "data")))
