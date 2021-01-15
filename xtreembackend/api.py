@@ -2,7 +2,7 @@ from typing import List
 
 from .repositories import NodeRepository
 from .domain.objects import Node, NodeData, Link, LinkType
-from .domain.validation import Guard, ValidationException, isListOf
+from .domain.validation import Guard, ValidationException, extractOrThrow
 from .domain.serialization import NodeSerializationService, LinkSerializationService
 from .domain.cache import Cache
 
@@ -17,7 +17,7 @@ GetNodesCommand = AggregateDataType({
 ]))
 
 def executeGetNodesCommand(cmd, repository):
-    cache = Cache.make()
+    cache = Cache.createEmpty()
     depthOfLevel = cmd["depth"]
     nodeCount = 0
     idsOnLevel = None
@@ -33,18 +33,18 @@ def executeGetNodesCommand(cmd, repository):
     assignIdsForNextLevel(cmd["ids"])
 
     while depthOfLevel >= 0:
-        newIdsOnLevel = [id for id in idsOnLevel if not cache.hasNode(id)]
+        newIdsOnLevel = [id for id in idsOnLevel if not Cache.hasNode(cache, id)]
         newNodesOnLevel = repository.get(newIdsOnLevel)
         for (id, node) in newNodesOnLevel.items():
-            cache.storeNode(node)
+            Cache.storeNode(cache, node)
 
         depthOfLevel -= 1
         if depthOfLevel >= 0:
-            idsWithUnknownChildrenOnLevel = [id for id in idsOnLevel if not cache.hasChildrenOf(id)]
+            idsWithUnknownChildrenOnLevel = [id for id in idsOnLevel if not Cache.hasChildrenOf(cache, id)]
             for (id, children) in repository.getChildren(idsWithUnknownChildrenOnLevel).items():
-                cache.storeChildren(id, children)
+                Cache.storeChildren(cache, id, children)
 
-            assignIdsForNextLevel([link["targetId"] for parentId in idsOnLevel for link in cache.getChildrenOf(parentId)])
+            assignIdsForNextLevel([link["targetId"] for parentId in idsOnLevel for link in Cache.getChildrenOf(cache, parentId)])
 
     return cache
 
@@ -58,11 +58,13 @@ def executeCreateNodeCommand(cmd, repository: NodeRepository) -> Node:
     node = repository.create(cmd["nodeData"])
 
     if cmd["parentId"].hasValue():
-        repository.link(Link.create({
-            "sourceId": cmd["parentId"],
+        link = Link.create({
+            "sourceId": cmd["parentId"].extract(),
             "targetId": node["id"],
             "type": "general"
-        }))
+        })
+
+        repository.link(extractOrThrow(link))
 
     return node
 
@@ -111,4 +113,5 @@ UpdateNodeDataCommand = AggregateDataType({
 
 def executeUpdateNodeDataCommand(cmd, repository: NodeRepository):
     repository.update(cmd["id"], cmd["data"])
+
 

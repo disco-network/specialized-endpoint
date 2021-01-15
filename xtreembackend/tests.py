@@ -1,8 +1,27 @@
 from django.test import TestCase
 
 from .repositories import NodeRepository
-from .api import CreateNodeCommand, GetNodesCommand
-from .domain.objects import Node, NodeData, NodeService, NodeType, Link, LinkType
+from .api import CreateNodeCommand, GetNodesCommand, executeCreateNodeCommand, executeGetNodesCommand
+from .domain.objects import Node, NodeData, NodeType, Link, LinkType
+from .domain.cache import Cache
+from .domain.dataspecs import MapDataType, ListDataType, IntDataType, StringDataType
+from .domain.validation import extractOrThrow
+
+class DataSpecTestCase(TestCase):
+    def test_map(self):
+        ismap = MapDataType(IntDataType, StringDataType)
+        instance = ismap.create({1: "one", 2: "two"})
+        serialized = ismap.serialize(extractOrThrow(instance))
+
+        self.assertEqual(serialized[1], "one")
+
+    def test_list(self):
+        intlist = ListDataType(IntDataType)
+        instance = intlist.create([1])
+        serialized = intlist.serialize(extractOrThrow(instance))
+
+        self.assertEqual(len(serialized), 1)
+        self.assertEqual(serialized[0], 1)
 
 class CommandTestCase(TestCase):
     def test(self):
@@ -12,24 +31,30 @@ class CommandTestCase(TestCase):
         for i in range(3):
             title = "Title " + str(i)
             content = "Content " + str(i)
-            type = NodeType.GENERAL
-            createCmd = CreateNodeCommand.make(
-                nodeData=NodeService.makeData(title=title, content=content, type=type),
-                parentId=parentId)
-            node = createCmd.execute(repo)
-            parentId = node.id
+            createCmd = CreateNodeCommand.create({
+                "nodeData": {
+                    "title": title,
+                    "content": content,
+                    "type": "general",
+                },
+                "parentId": parentId,
+            })
+            node = executeCreateNodeCommand(extractOrThrow(createCmd), repo)
+            parentId = node["id"]
 
-        getCmd = GetNodesCommand.make(
-            ids=[1],
-            depth=1)
-        cache = getCmd.execute(repo)
+        getCmd = GetNodesCommand.create({
+            "ids": [1],
+            "depth": 1,
+        })
+        self.assertTrue(getCmd.isOk())
+        cache = executeGetNodesCommand(getCmd.extract(), repo)
 
-        self.assertTrue(cache.hasNode(1), "Node 1 is in resulting cache")
-        self.assertTrue(cache.hasNode(2), "Node 2 is in resulting cache")
-        self.assertTrue(not cache.hasNode(3), "Node 3 is not in resulting cache")
-        self.assertEqual(cache.getNode(1).data.title, "Title 0", "Node 1 has the correct title")
-        self.assertListEqual([cache.getChildrenOf(1)[0].targetId], [2], "Node 2 is a child of node 1")
-        self.assertFalse(cache.hasChildrenOf(2), "The children of node 2 are not in the cache")
+        self.assertTrue(Cache.hasNode(cache, 1), "Node 1 is in resulting cache")
+        self.assertTrue(Cache.hasNode(cache, 2), "Node 2 is in resulting cache")
+        self.assertTrue(not Cache.hasNode(cache, 3), "Node 3 is not in resulting cache")
+        self.assertEqual(Cache.getNode(cache, 1)["data"]["title"], "Title 0", "Node 1 has the correct title")
+        self.assertListEqual([Cache.getChildrenOf(cache, 1)[0]["targetId"]], [2], "Node 2 is a child of node 1")
+        self.assertFalse(Cache.hasChildrenOf(cache, 2), "The children of node 2 are not in the cache")
 
 """
 Ideas for more unit tests:

@@ -1,29 +1,31 @@
 import json
+import traceback
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 
 from .models import Node as DBNode, Link as DBLink
 from .repositories import NodeRepository
-from .api import GetNodesCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand
+from .api import executeGetNodesCommand, GetNodesCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand
+from .domain.objects import Node, Link
+from .domain.cache import Cache
 
-from .domain.validation import Guard, ValidationException
-from .domain.serialization import NodeSerializationService, CacheSerializationService
+from .domain.validation import Guard, ValidationException, extractOrThrow
 
 nodeRepository = NodeRepository()
 
 def createNode(request):
     try:
-        command = CreateNodeCommand.deserialize(getRawCommand(request))
+        command = extractOrThrow(CreateNodeCommand.create(getRawCommand(request)))
         node = command.execute(nodeRepository)
-        return JsonResponse(NodeSerializationService.serialize(node))
+        return JsonResponse(Node.serialize(node))
 
     except ValidationException:
         return HttpResponse(status=400)
 
 def deleteLinks(request):
     try:
-        command = UnlinkCommand.deserialize(getRawCommand(request))
+        command = extractOrThrow(UnlinkCommand.create(getRawCommand(request)))
         command.execute(nodeRepository)
 
         return HttpResponse(status=204)
@@ -33,7 +35,7 @@ def deleteLinks(request):
 
 def addLinks(request):
     try:
-        command = LinkCommand.deserialize(getRawCommand(request))
+        command = extractOrThrow(LinkCommand.create(getRawCommand(request)))
         command.execute(nodeRepository)
 
         return HttpResponse(status=204)
@@ -43,7 +45,7 @@ def addLinks(request):
 
 def moveLinks(request):
     try:
-        command = MoveCommand.deserialize(getRawCommand(request))
+        command = extractOrThrow(MoveCommand.create(getRawCommand(request)))
         command.execute()
         return HttpResponse(204)
 
@@ -52,7 +54,7 @@ def moveLinks(request):
 
 def updateNode(request):
     try:
-        command = UpdateNodeDataCommand.deserialize(getRawCommand(request))
+        command = extractOrThrow(UpdateNodeDataCommand.create(getRawCommand(request)))
         command.execute()
         return HttpResponse(status=204)
     except NodeNotFoundException:
@@ -62,10 +64,12 @@ def updateNode(request):
 
 def getNodes(request):
     try:
-        command = GetNodesCommand.deserialize(getRawCommand(request))
-        resultCache = command.execute()
-        return JsonResponse(CacheSerializationService.serialize(resultCache))
-    except ValidationException:
+        command = extractOrThrow(GetNodesCommand.create(getRawCommand(request)))
+        resultCache = executeGetNodesCommand(command, nodeRepository)
+        return JsonResponse(Cache.serialize(resultCache))
+    except ValidationException as e:
+        print("ValidationException:")
+        traceback.print_exc()
         return HttpResponse(status=400)
 
 def getRawCommand(request):

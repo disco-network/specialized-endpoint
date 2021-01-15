@@ -18,11 +18,9 @@ class Guard:
 class ValidationException(Exception):
     pass
 
-def isListOf(l, predicate):
-    return isinstance(l, list) and \
-        all(map(predicate, l))
+def extractOrThrow(result):
+    if result.isOk():
+        return result.extract()
+    else:
+        raise ValidationException(result.extract())
 
-def isDictOf(x, isKeyType, isValueType):
-    return isinstance(x, dict) and \
-        all(map(isKeyType, x.keys())) and \
-        all(map(isValueType, x.values()))

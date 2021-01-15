@@ -1,73 +1,57 @@
 from typing import List, Dict, Any
 from .objects import Node, Link
-from .validation import ValidationException, isDictOf, isListOf
+from .validation import ValidationException
+from .dataspecs import AggregateDataType, MapDataType, IntDataType, ListDataType, Result
 
-class Cache:
-    nodesById: Dict[int, Any]
-    childrenByParentId: Dict[int, List[Any]]
+def haveAllLinksParentId(links, parentId):
+    return all(map(lambda l: l["sourceId"] == parentId, links))
 
-    @staticmethod
-    def make(**kwargs):
-        nodesById = kwargs["nodesById"] if "nodesById" in kwargs else {}
-        childrenByParentId = kwargs["childrenByParentId"] if "childrenByParentId" in kwargs else {}
-        cache = Cache(
-            nodesById=nodesById,
-            childrenByParentId=childrenByParentId)
+Cache = AggregateDataType({
+    "nodesById": MapDataType(IntDataType, Node),
+    "childrenByParentId": MapDataType(IntDataType, ListDataType(Link)),
+}, lambda cache: Result.ensure([
+    (all(map(lambda parentId: haveAllLinksParentId(cache["childrenByParentId"], parentId), cache["childrenByParentId"])), "childrenByParentId should map a parent ID only to links with the given parent ID"),
+]))
 
-        if cache.isValid():
-            return cache
-        else:
-            raise ValidationException()
+def extendCache():
+    def createEmpty():
+        return {
+            "nodesById": {},
+            "childrenByParentId": {},
+        }
 
-    def isValid(self):
-        def fst(kv):
-            (k, v) = kv
-            return k
-        def snd(kv):
-            (k, v) = kv
-            return v
-        def haveAllLinksParentId(links, parentId):
-            return all(map(lambda l: l.sourceId == parentId, links))
+    def copy(cache):
+        return {
+            "nodesById": dict(cache["nodesById"]),
+            "childrenByParentId": dict(cache["childrenByParentId"]),
+        }
 
-        return isDictOf(self.nodesById,
-                        lambda k: isinstance(k, int),
-                        lambda v: isinstance(v, Node)) and \
-            isDictOf(self.childrenByParentId,
-                     lambda k: isinstance(k, int),
-                     lambda v: isListOf(
-                         lambda i: isinstance(i, Link))) and \
-            all(map(lambda kv: haveAllLinksParentId(snd(kv), fst(kv)), self.childrenByParentId))
+    def storeNode(cache, node):
+        cache["nodesById"][node["id"]] = node
 
-    def copy(self):
-        return Cache(
-            nodesById=dict(self.nodesById),
-            childrenByParentId=dict(self.childrenByParentId))
+    def hasNode(cache, nodeId):
+        return nodeId in cache["nodesById"]
 
-    def storeNode(self, node: Node):
-        self.nodesById[node.id] = node
+    def getNode(cache, nodeId):
+        return cache["nodesById"][nodeId] if Cache.hasNode(cache, nodeId) else None
 
-    def hasNode(self, nodeId):
-        return nodeId in self.nodesById
+    def storeChildren(cache, nodeId: int, children):
+        cache["childrenByParentId"][nodeId] = children
 
-    def getNode(self, nodeId):
-        return self.nodesById[nodeId] if self.hasNode(nodeId) else None
+    def hasChildrenOf(cache, nodeId: int):
+        return nodeId in cache["childrenByParentId"]
 
-    def storeChildren(self, nodeId: int, children):
-        self.childrenByParentId[nodeId] = children
+    def getChildrenOf(cache, nodeId):
+        return cache["childrenByParentId"][nodeId] if Cache.hasChildrenOf(cache, nodeId) else None
 
-    def hasChildrenOf(self, nodeId):
-        return nodeId in self.childrenByParentId
+    Cache.createEmpty = createEmpty
+    Cache.copy = copy
+    Cache.storeNode = storeNode
+    Cache.hasNode = hasNode
+    Cache.getNode = getNode
+    Cache.storeChildren = storeChildren
+    Cache.hasChildrenOf = hasChildrenOf
+    Cache.getChildrenOf = getChildrenOf
 
-    def getChildrenOf(self, nodeId):
-        return self.childrenByParentId[nodeId] if self.hasChildrenOf(nodeId) else None
+extendCache()
 
-    # private
-    def __init__(self, **attributes):
-        self.__dict__.update(attributes)
-
-def mapDictValues(fn, dictionary):
-    def applyFnToSecondEntry(kv):
-        (k, v) = kv
-        return (k, fn(v))
-
-    return dict(map(applyFnToSecondEntry, dictionary.items()))

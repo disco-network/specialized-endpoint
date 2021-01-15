@@ -2,6 +2,7 @@ from typing import List
 
 from .models import Node as DBNode, Link as DBLink
 from .domain.objects import Node, NodeType, NodeData, Link, LinkType
+from .domain.validation import ValidationException
 
 class NodeRepository:
     def get(self, ids: List[int]):
@@ -64,7 +65,7 @@ class NodeRepository:
 
     def _toDomainNode(self, dbNode: DBNode) -> Node:
         creationResult = Node.create({
-            "id": id,
+            "id": dbNode.id,
             "data": {
                 "title": dbNode.title,
                 "content": dbNode.content,

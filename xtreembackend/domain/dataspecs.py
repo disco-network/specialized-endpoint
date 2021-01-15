@@ -39,10 +39,11 @@ class Maybe:
     def value(value):
         return Maybe(True, value)
 
+    @staticmethod
     def nothing():
         return Maybe(False)
 
-    def __init(self, hasValue, value=None):
+    def __init__(self, hasValue, value=None):
         self._hasValue = hasValue
         self.value = value
 
@@ -63,13 +64,13 @@ class Nullable:
         if not data.hasValue():
             return None
         else:
-            return self.innerType.serialize(value.extract())
+            return self.innerType.serialize(data.extract())
 
     def create(self, data):
         if data is None:
             return Result.success(Maybe.nothing())
         else:
-            return self.innerType.create(value).map(lambda x: Maybe.value(x))
+            return self.innerType.create(data).map(lambda x: Maybe.value(x))
 
 class AggregateDataType:
     def __init__(self, schema, consistencyCheck):
@@ -186,7 +187,7 @@ class ListDataType:
 
     def create(self, data):
         if isinstance(data, list):
-            results = map(lambda inner: self.innerType.create(inner), data)
+            results = list(map(lambda inner: self.innerType.create(inner), data))
             if len([x for x in results if not x.isOk()]) == 0:
                 items = list(map(lambda result: result.extract(), results))
                 return Result.success(items)
@@ -216,3 +217,34 @@ class EnumDataType:
             return Result.success(data)
         else:
             return Result.fail("invalid value")
+
+class MapDataType:
+    def __init__(self, keyType, valueType):
+        if keyType not in [IntDataType, StringDataType]:
+            raise Exception("illegal key type")
+        self.keyType = keyType
+        self.valueType = valueType
+
+    def equals(self, otherType):
+        return isinstance(otherType, MapDataType) and \
+            self.keyType.equals(otherType.keyType) and \
+            self.valueType.equals(otherType.valueType)
+
+    def serialize(self, data):
+        serialized = {}
+        for (key, value) in data.items():
+            serialized[self.keyType.serialize(key)] = self.valueType.serialize(value)
+        return serialized
+
+    def create(self, data):
+        if isinstance(data, dict):
+            obj = {}
+            for (key, value) in data.items():
+                keyResult = self.keyType.create(key)
+                valueResult = self.valueType.create(value)
+                if keyResult.isOk() and valueResult.isOk():
+                    obj[keyResult.extract()] = valueResult.extract()
+                else:
+                    return Result.fail("entry " + key + " invalid")
+            return Result.success(obj)
+        return Result.fail("should be a dictionary")

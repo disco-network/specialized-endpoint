@@ -26,7 +26,7 @@ SECRET_KEY = 'bdg(*md!szk9$g%2%7v$wa_v27*tnvpz08gf7@m&+#7ba98#lj'
 DEBUG = True
 
 ALLOWED_HOSTS = [
-	'xtreem.datokrat.sirius.uberspace.de'
+    'localhost'
 ]
 
 
