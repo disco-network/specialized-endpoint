@@ -2,11 +2,9 @@ from typing import List
 
 from .repositories import NodeRepository
 from .domain.objects import Node, NodeData, Link, LinkType
-from .domain.validation import Guard, ValidationException, extractOrThrow
-from .domain.serialization import NodeSerializationService, LinkSerializationService
 from .domain.cache import Cache
 
-from .domain.dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable
+from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable
 
 GetNodesCommand = AggregateDataType({
     "ids": ListDataType(IntDataType),
@@ -20,7 +18,7 @@ def executeGetNodesCommand(cmd, repository):
     cache = Cache.createEmpty()
     depthOfLevel = cmd["depth"]
     nodeCount = 0
-    idsOnLevel = None
+    idsOnLevel = []
 
     def assignIdsForNextLevel(ids):
         nonlocal nodeCount, depthOfLevel, idsOnLevel
@@ -64,7 +62,7 @@ def executeCreateNodeCommand(cmd, repository: NodeRepository) -> Node:
             "type": "general"
         })
 
-        repository.link(extractOrThrow(link))
+        repository.link(link)
 
     return node
 

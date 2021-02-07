@@ -1,4 +1,4 @@
-from .dataspecs import Result, EnumDataType, ListDataType, IntDataType, StringDataType, AggregateDataType
+from xtreembackend.dataspecs import Result, EnumDataType, ListDataType, IntDataType, StringDataType, AggregateDataType
 
 NodeType = EnumDataType([
     "general",

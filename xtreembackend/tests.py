@@ -4,21 +4,21 @@ from .repositories import NodeRepository
 from .api import CreateNodeCommand, GetNodesCommand, executeCreateNodeCommand, executeGetNodesCommand
 from .domain.objects import Node, NodeData, NodeType, Link, LinkType
 from .domain.cache import Cache
-from .domain.dataspecs import MapDataType, ListDataType, IntDataType, StringDataType
-from .domain.validation import extractOrThrow
+from .dataspecs import MapDataType, ListDataType, IntDataType, StringDataType
+from .validation import extractOrThrow
 
 class DataSpecTestCase(TestCase):
     def test_map(self):
         ismap = MapDataType(IntDataType, StringDataType)
         instance = ismap.create({1: "one", 2: "two"})
-        serialized = ismap.serialize(extractOrThrow(instance))
+        serialized = ismap.serialize(instance)
 
         self.assertEqual(serialized[1], "one")
 
     def test_list(self):
         intlist = ListDataType(IntDataType)
         instance = intlist.create([1])
-        serialized = intlist.serialize(extractOrThrow(instance))
+        serialized = intlist.serialize(instance)
 
         self.assertEqual(len(serialized), 1)
         self.assertEqual(serialized[0], 1)
@@ -39,15 +39,15 @@ class CommandTestCase(TestCase):
                 },
                 "parentId": parentId,
             })
-            node = executeCreateNodeCommand(extractOrThrow(createCmd), repo)
+            node = executeCreateNodeCommand(createCmd, repo)
             parentId = node["id"]
 
         getCmd = GetNodesCommand.create({
             "ids": [1],
             "depth": 1,
         })
-        self.assertTrue(getCmd.isOk())
-        cache = executeGetNodesCommand(getCmd.extract(), repo)
+
+        cache = executeGetNodesCommand(getCmd, repo)
 
         self.assertTrue(Cache.hasNode(cache, 1), "Node 1 is in resulting cache")
         self.assertTrue(Cache.hasNode(cache, 2), "Node 2 is in resulting cache")

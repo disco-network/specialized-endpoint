@@ -2,7 +2,7 @@ from typing import List
 
 from .models import Node as DBNode, Link as DBLink
 from .domain.objects import Node, NodeType, NodeData, Link, LinkType
-from .domain.validation import ValidationException
+from .validation import ValidationException
 
 class NodeRepository:
     def get(self, ids: List[int]):
@@ -64,7 +64,7 @@ class NodeRepository:
         return DBLink.objects.filter(from_node_id=link["sourceId"], to_node_id=link["targetId"], type=link["type"])
 
     def _toDomainNode(self, dbNode: DBNode) -> Node:
-        creationResult = Node.create({
+        return Node.create({
             "id": dbNode.id,
             "data": {
                 "title": dbNode.title,
@@ -73,23 +73,13 @@ class NodeRepository:
             },
         })
 
-        if not creationResult.isOk():
-            raise ValidationException(creationResult.extract())
-        else:
-            return creationResult.extract()
-
     def _toDomainLink(self, dbLink: DBLink) -> Link:
-        creationResult = Link.create({
+        return Link.create({
             "id": dbLink.id,
             "sourceId": dbLink.from_node_id,
             "targetId": dbLink.to_node_id,
             "type": dbLink.type,
         })
-
-        if not creationResult.isOk():
-            raise ValidationException(creationResult.extract())
-        else:
-            return creationResult.extract()
 
 class NodeNotFoundException(Exception):
     pass

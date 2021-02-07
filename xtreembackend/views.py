@@ -10,13 +10,13 @@ from .api import executeGetNodesCommand, GetNodesCommand, CreateNodeCommand, Unl
 from .domain.objects import Node, Link
 from .domain.cache import Cache
 
-from .domain.validation import Guard, ValidationException, extractOrThrow
+from .validation import Guard, ValidationException
 
 nodeRepository = NodeRepository()
 
 def createNode(request):
     try:
-        command = extractOrThrow(CreateNodeCommand.create(getRawCommand(request)))
+        command = CreateNodeCommand.create(getRawCommand(request))
         node = command.execute(nodeRepository)
         return JsonResponse(Node.serialize(node))
 
@@ -25,7 +25,7 @@ def createNode(request):
 
 def deleteLinks(request):
     try:
-        command = extractOrThrow(UnlinkCommand.create(getRawCommand(request)))
+        command = UnlinkCommand.create(getRawCommand(request))
         command.execute(nodeRepository)
 
         return HttpResponse(status=204)
@@ -35,7 +35,7 @@ def deleteLinks(request):
 
 def addLinks(request):
     try:
-        command = extractOrThrow(LinkCommand.create(getRawCommand(request)))
+        command = LinkCommand.create(getRawCommand(request))
         command.execute(nodeRepository)
 
         return HttpResponse(status=204)
@@ -45,7 +45,7 @@ def addLinks(request):
 
 def moveLinks(request):
     try:
-        command = extractOrThrow(MoveCommand.create(getRawCommand(request)))
+        command = MoveCommand.create(getRawCommand(request))
         command.execute()
         return HttpResponse(204)
 
@@ -54,7 +54,7 @@ def moveLinks(request):
 
 def updateNode(request):
     try:
-        command = extractOrThrow(UpdateNodeDataCommand.create(getRawCommand(request)))
+        command = UpdateNodeDataCommand.create(getRawCommand(request))
         command.execute()
         return HttpResponse(status=204)
     except NodeNotFoundException:
@@ -64,10 +64,10 @@ def updateNode(request):
 
 def getNodes(request):
     try:
-        command = extractOrThrow(GetNodesCommand.create(getRawCommand(request)))
+        command = GetNodesCommand.create(getRawCommand(request))
         resultCache = executeGetNodesCommand(command, nodeRepository)
         return JsonResponse(Cache.serialize(resultCache))
-    except ValidationException as e:
+    except ValidationException:
         print("ValidationException:")
         traceback.print_exc()
         return HttpResponse(status=400)

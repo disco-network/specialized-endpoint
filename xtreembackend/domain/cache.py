@@ -1,7 +1,9 @@
 from typing import List, Dict, Any
-from .objects import Node, Link
-from .validation import ValidationException
-from .dataspecs import AggregateDataType, MapDataType, IntDataType, ListDataType, Result
+
+from xtreembackend.validation import ValidationException
+from xtreembackend.dataspecs import AggregateDataType, MapDataType, IntDataType, ListDataType, Result
+
+from xtreembackend.domain.objects import Node, Link
 
 def haveAllLinksParentId(links, parentId):
     return all(map(lambda l: l["sourceId"] == parentId, links))

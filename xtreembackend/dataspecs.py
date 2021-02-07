@@ -1,3 +1,10 @@
+from .validation import ValidationException
+
+# ======
+# Utility definitions
+# Data types: see below
+# ======
+
 class Result:
     @staticmethod
     def success(value):
@@ -45,13 +52,17 @@ class Maybe:
 
     def __init__(self, hasValue, value=None):
         self._hasValue = hasValue
-        self.value = value
+        self._value = value
 
     def hasValue(self):
         return self._hasValue
 
     def extract(self):
-        return self.value
+        return self._value
+
+# ======
+# Here come the data types
+# ======
 
 class Nullable:
     def __init__(self, innerType):
@@ -68,9 +79,10 @@ class Nullable:
 
     def create(self, data):
         if data is None:
-            return Result.success(Maybe.nothing())
+            return Maybe.nothing()
         else:
-            return self.innerType.create(data).map(lambda x: Maybe.value(x))
+            innerObject = self.innerType.create(data)
+            return Maybe.value(innerObject)
 
 class AggregateDataType:
     def __init__(self, schema, consistencyCheck):
@@ -90,40 +102,27 @@ class AggregateDataType:
 
         return data
 
+    # might throw a ValidationException
     def create(self, data):
-        result = self.checkPrerequisites(data)
-        if not result.isOk():
-            return Result.fail({
-                "type": "prerequisite",
-                "error": result.extract(),
-            })
-
-        result = self.parseFields(data)
-        if not result.isOk():
-            return Result.fail({
-                "type": "fields",
-                "error": result.extract(),
-            })
-        fields = result.extract()
+        self.checkPrerequisites(data)
+        fields = self.parseFields(data)
 
         result = self.consistencyCheck(fields)
         if not result.isOk():
-            return Result.fail({
-                "type": "consistency",
-                "error": result.extract(),
+            raise ValidationException({
+                "message": "AggregateDataType: consistency check failed",
+                "innerErrors": result.extract(),
             })
 
-        return Result.success(fields)
+        return fields
 
     def checkPrerequisites(self, data):
         if not isinstance(data, dict):
-            return "data must be a dictionary"
+            raise ValidationException("AggregateDataType: data must be a dictionary")
 
         for (field, fieldType) in self.schema.items():
             if field not in data:
-                return Result.fail("field " + field + " is missing")
-
-        return Result.success(None)
+                raise ValidationException("AggregateDataType: field " + field + " is missing")
 
     def parseFields(self, data):
         fields = {}
@@ -131,17 +130,20 @@ class AggregateDataType:
         errorsOccured = False
 
         for (field, fieldType) in self.schema.items():
-            result = fieldType.create(data[field])
-            if result.isOk():
-                fields[field] = result.extract()
-            else:
+            try:
+                fields[field] = fieldType.create(data[field])
+            except ValidationException as e:
                 errorsOccured = True
-                errors[field] = result.extract()
+                errors[field] = e
 
         if errorsOccured:
-            return Result.fail(errors)
+            errorObject = {
+                "message": "AggregateDataType: could not parse fields",
+                "innerErrors": errors
+            }
+            raise ValidationException(errorObject)
         else:
-            return Result.success(fields)
+            return fields
 
 class IntDataType:
     @staticmethod
@@ -155,9 +157,9 @@ class IntDataType:
     @staticmethod
     def create(data):
         if isinstance(data, int):
-            return Result.success(data)
+            return data
         else:
-            return Result.fail("should be an integer")
+            raise ValidationException("should be an integer")
 
 class StringDataType:
     @staticmethod
@@ -171,9 +173,9 @@ class StringDataType:
     @staticmethod
     def create(data):
         if isinstance(data, str):
-            return Result.success(data)
+            return data
         else:
-            return Result.fail("should be a string")
+            raise ValidationException("should be a string")
 
 class ListDataType:
     def __init__(self, innerType):
@@ -187,19 +189,19 @@ class ListDataType:
 
     def create(self, data):
         if isinstance(data, list):
-            results = list(map(lambda inner: self.innerType.create(inner), data))
-            if len([x for x in results if not x.isOk()]) == 0:
-                items = list(map(lambda result: result.extract(), results))
-                return Result.success(items)
-            else:
-                return Result.fail({
-                    "type": "items",
-                    "error": [None if x.isOk() else x.extract() for x in results],
+            try:
+                return list(map(lambda inner: self.innerType.create(inner), data))
+            except ValidationException as e:
+                # This implementation only reports the first error while parsing the list.
+                # It would be possible to write a more sophisticated method that
+                # reports errors for all items.
+                raise ValidationException({
+                    "message": "ListDataType: could not parse items",
+                    "innerErrors": e,
                 })
         else:
-            return Result.fail({
-                "type": "prerequisite",
-                "error": "should be a list",
+            raise ValidationException({
+                "message": "ListDataType: should be a list"
             })
 
 class EnumDataType:
@@ -214,9 +216,9 @@ class EnumDataType:
 
     def create(self, data):
         if data in self.options:
-            return Result.success(data)
+            return data
         else:
-            return Result.fail("invalid value")
+            raise ValidationException("EnumDataType: invalid value")
 
 class MapDataType:
     def __init__(self, keyType, valueType):
@@ -240,11 +242,21 @@ class MapDataType:
         if isinstance(data, dict):
             obj = {}
             for (key, value) in data.items():
-                keyResult = self.keyType.create(key)
-                valueResult = self.valueType.create(value)
-                if keyResult.isOk() and valueResult.isOk():
-                    obj[keyResult.extract()] = valueResult.extract()
-                else:
-                    return Result.fail("entry " + key + " invalid")
-            return Result.success(obj)
-        return Result.fail("should be a dictionary")
+                try:
+                    keyResult = self.keyType.create(key)
+                except ValidationException as e:
+                    raise ValidationException({
+                        "message": "MapDataType: could not parse key " + key,
+                        "innerErrors": e
+                    })
+                try:
+                    valueResult = self.valueType.create(value)
+                except ValidationException as e:
+                    raise ValidationException({
+                        "message": "MapDataType: could not parse value for " + key,
+                        "innerErrors": e
+                    })
+                
+                obj[keyResult] = valueResult
+            return obj
+        raise ValidationException("should be a dictionary")
