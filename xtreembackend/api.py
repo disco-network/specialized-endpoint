@@ -6,6 +6,17 @@ from .domain.cache import Cache
 
 from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable
 
+#
+# This file contains the specification and implementation of the API
+# that is used for client-server communication.
+#
+# The API consists of `Commands`.
+# Each `Command` consists of a data type specification
+# (usually, as an AggregateDataType) and an `execute`
+# function that takes an instance of the `Command` and
+# the node repository (think: "database") it operates on.
+#
+
 GetNodesCommand = AggregateDataType({
     "ids": ListDataType(IntDataType),
     "depth": IntDataType,

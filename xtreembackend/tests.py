@@ -1,11 +1,11 @@
 from django.test import TestCase
 
 from .repositories import NodeRepository
-from .api import CreateNodeCommand, GetNodesCommand, executeCreateNodeCommand, executeGetNodesCommand
+from .api import CreateNodeCommand, GetNodesCommand, LinkCommand, executeCreateNodeCommand, executeGetNodesCommand, executeLinkCommand
 from .domain.objects import Node, NodeData, NodeType, Link, LinkType
 from .domain.cache import Cache
 from .dataspecs import MapDataType, ListDataType, IntDataType, StringDataType
-from .validation import extractOrThrow
+from .validation import ValidationException
 
 class DataSpecTestCase(TestCase):
     def test_map(self):
@@ -23,7 +23,164 @@ class DataSpecTestCase(TestCase):
         self.assertEqual(len(serialized), 1)
         self.assertEqual(serialized[0], 1)
 
-class CommandTestCase(TestCase):
+class LinkCommandTestCase(TestCase):
+    def test_empty_list(self):
+        repo = NodeRepository()
+
+        node1 = repo.create(NodeData.create({
+            "title": "One",
+            "content": "Lorem",
+            "type": "general",
+        }))
+
+        cmd = LinkCommand.create({
+            "links": [],
+        })
+
+        executeLinkCommand(cmd, repo)
+
+        linksToChildren = repo.getChildren([1])[1]
+
+        self.assertEqual(len(linksToChildren), 0)
+
+    def test_single_link(self):
+        repo = NodeRepository()
+
+        node1 = repo.create(NodeData.create({
+            "title": "One",
+            "content": "Lorem",
+            "type": "general",
+        }))
+
+        node2 = repo.create(NodeData.create({
+            "title": "Two",
+            "content": "ipsum",
+            "type": "general",
+        }))
+
+        cmd = LinkCommand.create({
+            "links": [
+                {
+                    "sourceId": node1["id"],
+                    "targetId": node2["id"],
+                    "type": "general",
+                },
+            ],
+        })
+
+        executeLinkCommand(cmd, repo)
+
+        allChildren = repo.getChildren([1, 2])
+        linksToChildrenOfNode1 = allChildren[1]
+        linksToChildrenOfNode2 = allChildren[2]
+
+        self.assertEqual(len(linksToChildrenOfNode1), 1)
+        self.assertEqual(len(linksToChildrenOfNode2), 0)
+        self.assertEqual(linksToChildrenOfNode1[0]["sourceId"], node1["id"])
+        self.assertEqual(linksToChildrenOfNode1[0]["targetId"], node2["id"])
+
+    def test_create_link_that_already_exists_with_same_type(self):
+        repo = NodeRepository()
+
+        node1 = repo.create(NodeData.create({
+            "title": "One",
+            "content": "Lorem",
+            "type": "general",
+        }))
+
+        node2 = repo.create(NodeData.create({
+            "title": "Two",
+            "content": "ipsum",
+            "type": "general",
+        }))
+
+        repo.link(Link.create({
+            "sourceId": node1["id"],
+            "targetId": node2["id"],
+            "type": "general",
+        }))
+
+        cmd = LinkCommand.create({
+            "links": [
+                {
+                    "sourceId": node1["id"],
+                    "targetId": node2["id"],
+                    "type": "general",
+                },
+            ],
+        })
+
+        executeLinkCommand(cmd, repo)
+
+        allChildren = repo.getChildren([1, 2])
+        linksToChildrenOfNode1 = allChildren[1]
+        linksToChildrenOfNode2 = allChildren[2]
+
+        self.assertEqual(len(linksToChildrenOfNode1), 1)
+        self.assertEqual(len(linksToChildrenOfNode2), 0)
+        self.assertEqual(linksToChildrenOfNode1[0]["sourceId"], node1["id"])
+        self.assertEqual(linksToChildrenOfNode1[0]["targetId"], node2["id"])
+        self.assertEqual(linksToChildrenOfNode1[0]["type"], "general")
+        
+    def test_create_link_that_already_exists_with_different_type(self):
+        repo = NodeRepository()
+
+        node1 = repo.create(NodeData.create({
+            "title": "One",
+            "content": "Lorem",
+            "type": "general",
+        }))
+
+        node2 = repo.create(NodeData.create({
+            "title": "Two",
+            "content": "ipsum",
+            "type": "general",
+        }))
+
+        repo.link(Link.create({
+            "sourceId": node1["id"],
+            "targetId": node2["id"],
+            "type": "general",
+        }))
+
+        cmd = LinkCommand.create({
+            "links": [
+                {
+                    "sourceId": node1["id"],
+                    "targetId": node2["id"],
+                    "type": "pro_arg",
+                },
+            ],
+        })
+
+        executeLinkCommand(cmd, repo)
+
+        allChildren = repo.getChildren([1, 2])
+        linksToChildrenOfNode1 = allChildren[1]
+        linksToChildrenOfNode2 = allChildren[2]
+
+        self.assertEqual(len(linksToChildrenOfNode1), 2)
+        self.assertEqual(len(linksToChildrenOfNode2), 0)
+        self.assertEqual(linksToChildrenOfNode1[0]["sourceId"], node1["id"])
+        self.assertEqual(linksToChildrenOfNode1[0]["targetId"], node2["id"])
+        self.assertEqual(linksToChildrenOfNode1[0]["type"], "general")
+        self.assertEqual(linksToChildrenOfNode1[1]["sourceId"], node1["id"])
+        self.assertEqual(linksToChildrenOfNode1[1]["targetId"], node2["id"])
+        self.assertEqual(linksToChildrenOfNode1[1]["type"], "pro_arg")
+
+    def test_create_too_many_links(self):
+        with self.assertRaisesMessage(ValidationException): # Problem: Must provide expected message!
+            cmd = LinkCommand.create({
+                "links": [
+                    {
+                        "sourceId": node1["id"],
+                        "targetId": node2["id"],
+                        "type": "general",
+                    } for x in range(101)
+                ],
+            })        
+
+class CreateNodeTestCase(TestCase):
     def test(self):
         repo = NodeRepository()
 
