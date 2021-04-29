@@ -12,9 +12,10 @@ Cache = AggregateDataType({
     "nodesById": MapDataType(IntDataType, Node),
     "childrenByParentId": MapDataType(IntDataType, ListDataType(Link)),
 }, lambda cache: Result.ensure([
-    (all(map(lambda parentId: haveAllLinksParentId(cache["childrenByParentId"], parentId), cache["childrenByParentId"])), "childrenByParentId should map a parent ID only to links with the given parent ID"),
+    (all(map(lambda parentId: haveAllLinksParentId(cache["childrenByParentId"][parentId], parentId), cache["childrenByParentId"])), "childrenByParentId should map a parent ID only to links with the given parent ID"),
 ]))
 
+# adds helper methods to Cache
 def extendCache():
     def createEmpty():
         return {
@@ -25,7 +26,7 @@ def extendCache():
     def copy(cache):
         return {
             "nodesById": dict(cache["nodesById"]),
-            "childrenByParentId": dict(cache["childrenByParentId"]),
+            "childrenByParentId": dict(cache["childrenByParentId"]), # TODO: this only makes a shallo copy of the contained lists
         }
 
     def storeNode(cache, node):
