@@ -6,7 +6,7 @@ from django.shortcuts import render
 
 from .models import Node as DBNode, Link as DBLink
 from .repositories import NodeRepository
-from .api import executeGetNodesCommand, GetNodesCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand
+from .api import executeGetNodesCommand, GetNodesCommand, executeCreateNodeCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand
 from .domain.objects import Node, Link
 from .domain.cache import Cache
 
@@ -17,7 +17,7 @@ nodeRepository = NodeRepository()
 def createNode(request):
     try:
         command = CreateNodeCommand.create(getRawCommand(request))
-        node = command.execute(nodeRepository)
+        node = executeCreateNodeCommand(command, nodeRepository)
         return JsonResponse(Node.serialize(node))
 
     except ValidationException:
