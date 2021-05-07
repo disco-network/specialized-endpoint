@@ -22,7 +22,7 @@ NodeData = AggregateDataType({
 ]))
 
 Node = AggregateDataType({
-    "id": IntDataType,
+    "id": StringDataType,
     "data": NodeData,
 }, lambda node: Result.success(None))
 
@@ -33,8 +33,8 @@ LinkType = EnumDataType([
 ])
 
 Link = AggregateDataType({
-    "sourceId": IntDataType,
-    "targetId": IntDataType,
+    "sourceId": StringDataType,
+    "targetId": StringDataType,
     "type": LinkType,
 }, lambda link: Result.success(None))
 

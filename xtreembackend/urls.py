@@ -8,8 +8,8 @@ urlpatterns = [
     path("api/nodes/create", views.createNode, name="createNode"),
     path("api/nodes/update", views.updateNode, name="updateNode"),
 
-    path("api/nodes/deleteLinks", views.deleteLinks, name="deleteLinks"),
-    path("api/nodes/moveLinks", views.moveLinks, name="moveLinks"),
-    path("api/nodes/addLinks", views.addLinks, name="addLinks"),
+    path("api/links/delete", views.deleteLinks, name="deleteLinks"),
+    path("api/links/move", views.moveLinks, name="moveLinks"),
+    path("api/links/add", views.addLinks, name="addLinks"),
 ]
 

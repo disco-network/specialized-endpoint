@@ -4,23 +4,28 @@ from .models import Node as DBNode, Link as DBLink
 from .domain.objects import Node, NodeType, NodeData, Link, LinkType
 from .validation import ValidationException
 
+# Abstracts the database.
+# Note that Django ids are integers, while the dataspec requires strings.
+# So this class translates between these two formats.
 class NodeRepository:
-    def get(self, ids: List[int]):
+    def get(self, ids):
+        ids = [int(id) for id in ids]
         query = DBNode.objects.filter(id__in=ids)
         nodesById = {}
         for id in ids:
-            nodesById[id] = None
+            nodesById[str(id)] = None
         for dbNode in query.all():
-            nodesById[dbNode.id] = self._toDomainNode(dbNode)
+            nodesById[str(dbNode.id)] = self._toDomainNode(dbNode)
         return nodesById
 
-    def getChildren(self, ids: List[int]):
+    def getChildren(self, ids):
+        ids = [int(id) for id in ids]
         query = DBLink.objects.filter(from_node_id__in=ids)
         linksByParentId = {}
         for id in ids:
-            linksByParentId[id] = []
+            linksByParentId[str(id)] = []
         for dbLink in query.all():
-            linksByParentId[dbLink.from_node_id].append(self._toDomainLink(dbLink))
+            linksByParentId[str(dbLink.from_node_id)].append(self._toDomainLink(dbLink))
         return linksByParentId
 
     def create(self, data):
@@ -33,7 +38,7 @@ class NodeRepository:
     def link(self, link: Link):
         query = self._linkToQuery(link)
         if not query.exists():
-            dbLink = DBLink(from_node_id=link["sourceId"], to_node_id=link["targetId"], type=link["type"])
+            dbLink = DBLink(from_node_id=int(link["sourceId"]), to_node_id=int(link["targetId"]), type=link["type"])
             dbLink.full_clean()
             dbLink.save()
         else:
@@ -47,8 +52,11 @@ class NodeRepository:
             dbLink = query.get()
             dbLink.deleted = True
 
-    def update(self, id: int, data) -> Node:
-        query = DBNode.objects.filter(id=id)
+    def update(self, id, data) -> Node:
+        # TODO: It would be better to catch errors
+        # parsing `id` as an integer.
+        # same for _linkToQuery(), link(), get() and getChildren().
+        query = DBNode.objects.filter(id=int(id, 10))
         if query.exists():
             node = query.get()
             node.title = data["title"]
@@ -61,11 +69,11 @@ class NodeRepository:
             raise NodeNotFoundException()
 
     def _linkToQuery(self, link: Link):
-        return DBLink.objects.filter(from_node_id=link["sourceId"], to_node_id=link["targetId"], type=link["type"])
+        return DBLink.objects.filter(from_node_id=int(link["sourceId"]), to_node_id=int(link["targetId"]), type=link["type"])
 
     def _toDomainNode(self, dbNode: DBNode) -> Node:
         return Node.create({
-            "id": dbNode.id,
+            "id": str(dbNode.id),
             "data": {
                 "title": dbNode.title,
                 "content": dbNode.content,
@@ -75,9 +83,9 @@ class NodeRepository:
 
     def _toDomainLink(self, dbLink: DBLink) -> Link:
         return Link.create({
-            "id": dbLink.id,
-            "sourceId": dbLink.from_node_id,
-            "targetId": dbLink.to_node_id,
+            "id": str(dbLink.id),
+            "sourceId": str(dbLink.from_node_id),
+            "targetId": str(dbLink.to_node_id),
             "type": dbLink.type,
         })
 

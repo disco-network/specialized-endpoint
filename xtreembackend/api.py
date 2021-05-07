@@ -4,7 +4,7 @@ from .repositories import NodeRepository
 from .domain.objects import Node, NodeData, Link, LinkType
 from .domain.cache import Cache
 
-from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable
+from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable, StringDataType
 
 #
 # This file contains the specification and implementation of the API
@@ -18,7 +18,7 @@ from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nul
 #
 
 GetNodesCommand = AggregateDataType({
-    "ids": ListDataType(IntDataType),
+    "ids": ListDataType(StringDataType),
     "depth": IntDataType,
 }, lambda cmd: Result.ensure([
     (cmd["depth"] >= 0, "The depth must be nonnegative"),
@@ -60,7 +60,7 @@ def executeGetNodesCommand(cmd, repository):
 
 CreateNodeCommand = AggregateDataType({
     "nodeData": NodeData,
-    "parentId": Nullable(IntDataType),
+    "parentId": Nullable(StringDataType),
 }, lambda cmd: Result.success(None))
 
 def executeCreateNodeCommand(cmd, repository: NodeRepository) -> Node:
@@ -116,7 +116,7 @@ def executeMoveCommand(cmd, repository: NodeRepository):
     executeLinkCommand(linkCmd, repository)
 
 UpdateNodeDataCommand = AggregateDataType({
-    "id": IntDataType,
+    "id": StringDataType,
     "data": NodeData,
 }, lambda data: Result.success(None))
 

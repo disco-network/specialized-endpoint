@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 from xtreembackend.validation import ValidationException
-from xtreembackend.dataspecs import AggregateDataType, MapDataType, IntDataType, ListDataType, Result
+from xtreembackend.dataspecs import AggregateDataType, MapDataType, IntDataType, ListDataType, Result, StringDataType
 
 from xtreembackend.domain.objects import Node, Link
 
@@ -9,8 +9,8 @@ def haveAllLinksParentId(links, parentId):
     return all(map(lambda l: l["sourceId"] == parentId, links))
 
 Cache = AggregateDataType({
-    "nodesById": MapDataType(IntDataType, Node),
-    "childrenByParentId": MapDataType(IntDataType, ListDataType(Link)),
+    "nodesById": MapDataType(StringDataType, Node),
+    "childrenByParentId": MapDataType(StringDataType, ListDataType(Link)),
 }, lambda cache: Result.ensure([
     (all(map(lambda parentId: haveAllLinksParentId(cache["childrenByParentId"][parentId], parentId), cache["childrenByParentId"])), "childrenByParentId should map a parent ID only to links with the given parent ID"),
 ]))
