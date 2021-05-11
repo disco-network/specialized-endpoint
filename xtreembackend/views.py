@@ -6,7 +6,7 @@ from django.shortcuts import render
 
 from .models import Node as DBNode, Link as DBLink
 from .repositories import NodeRepository
-from .api import executeGetNodesCommand, GetNodesCommand, executeCreateNodeCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand, executeLinkCommand, executeUnlinkCommand
+from .api import executeGetNodesCommand, GetNodesCommand, executeCreateNodeCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand, executeLinkCommand, executeMoveCommand, executeUnlinkCommand
 from .domain.objects import Node, Link
 from .domain.cache import Cache
 
@@ -46,7 +46,7 @@ def addLinks(request):
 def moveLinks(request):
     try:
         command = MoveCommand.create(getRawCommand(request))
-        command.execute()
+        executeMoveCommand(command, nodeRepository)
         return HttpResponse(204)
 
     except ValidationException:
