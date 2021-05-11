@@ -25,7 +25,8 @@ class NodeRepository:
         for id in ids:
             linksByParentId[str(id)] = []
         for dbLink in query.all():
-            linksByParentId[str(dbLink.from_node_id)].append(self._toDomainLink(dbLink))
+            if not dbLink.deleted:
+                linksByParentId[str(dbLink.from_node_id)].append(self._toDomainLink(dbLink))
         return linksByParentId
 
     def create(self, data):
@@ -51,6 +52,7 @@ class NodeRepository:
         if query.exists():
             dbLink = query.get()
             dbLink.deleted = True
+            dbLink.save()
 
     def update(self, id, data) -> Node:
         # TODO: It would be better to catch errors
