@@ -117,10 +117,21 @@ def executeMoveCommand(cmd, repository: NodeRepository):
 
 UpdateNodeDataCommand = AggregateDataType({
     "id": StringDataType,
-    "data": NodeData,
+    "title": Nullable(StringDataType),
+    "content": Nullable(StringDataType),
 }, lambda data: Result.success(None))
 
 def executeUpdateNodeDataCommand(cmd, repository: NodeRepository):
+    # retrieve current node data
+    nodeData = repository.get([cmd["id"]])[cmd["id"]].data
+
+    # change the fields that are to be changed
+    if cmd.title.hasValue():
+        nodeData.title = cmd.title.extract()
+    if cmd.content.hasValue():
+        nodeData.content = cmd.content.extract()
+
+    # store the modified node data
     repository.update(cmd["id"], cmd["data"])
 
 
