@@ -6,7 +6,7 @@ from django.shortcuts import render
 
 from .models import Node as DBNode, Link as DBLink
 from .repositories import NodeRepository
-from .api import executeGetNodesCommand, GetNodesCommand, executeCreateNodeCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand, executeUnlinkCommand
+from .api import executeGetNodesCommand, GetNodesCommand, executeCreateNodeCommand, CreateNodeCommand, UnlinkCommand, LinkCommand, MoveCommand, UpdateNodeDataCommand, executeLinkCommand, executeUnlinkCommand
 from .domain.objects import Node, Link
 from .domain.cache import Cache
 
@@ -36,7 +36,7 @@ def deleteLinks(request):
 def addLinks(request):
     try:
         command = LinkCommand.create(getRawCommand(request))
-        command.execute(nodeRepository)
+        executeLinkCommand(command, nodeRepository)
 
         return HttpResponse(status=204)
 
