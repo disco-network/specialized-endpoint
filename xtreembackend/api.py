@@ -123,15 +123,18 @@ UpdateNodeDataCommand = AggregateDataType({
 
 def executeUpdateNodeDataCommand(cmd, repository: NodeRepository):
     # retrieve current node data
-    nodeData = repository.get([cmd["id"]])[cmd["id"]].data
+    nodeData = repository.get([cmd["id"]])[cmd["id"]]["data"]
 
     # change the fields that are to be changed
-    if cmd.title.hasValue():
-        nodeData.title = cmd.title.extract()
-    if cmd.content.hasValue():
-        nodeData.content = cmd.content.extract()
+    if cmd["title"].hasValue():
+        nodeData["title"] = cmd["title"].extract()
+    if cmd["content"].hasValue():
+        nodeData["content"] = cmd["content"].extract()
+
+    print("UpdateNodeData")
+    print(nodeData)
 
     # store the modified node data
-    repository.update(cmd["id"], cmd["data"])
+    repository.update(cmd["id"], nodeData)
 
 
