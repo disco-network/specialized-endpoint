@@ -1,7 +1,7 @@
 from typing import List
 
 from .models import Node as DBNode, Link as DBLink
-from .domain.objects import Node, NodeType, NodeData, Link, LinkType
+from .domain.objects import LinkID, Node, NodeType, NodeData, Link, LinkType
 from .validation import ValidationException
 
 # Abstracts the database.
@@ -37,7 +37,7 @@ class NodeRepository:
         return self._toDomainNode(dbNode)
 
     def link(self, link: Link):
-        query = self._linkToQuery(link)
+        query = self._linkOrLinkIdToQuery(link)
         if not query.exists():
             dbLink = DBLink(from_node_id=int(link["sourceId"]), to_node_id=int(link["targetId"]), type=link["type"])
             dbLink.full_clean()
@@ -45,10 +45,11 @@ class NodeRepository:
         else:
             dbLink = query.get()
             dbLink.deleted = False
+            dbLink.type = link["type"]
             dbLink.save()
 
-    def unlink(self, link: Link):
-        query = self._linkToQuery(link)
+    def unlink(self, linkID: LinkID):
+        query = self._linkOrLinkIdToQuery(linkID)
         if query.exists():
             dbLink = query.get()
             dbLink.deleted = True
@@ -70,8 +71,8 @@ class NodeRepository:
         else:
             raise NodeNotFoundException()
 
-    def _linkToQuery(self, link: Link):
-        return DBLink.objects.filter(from_node_id=int(link["sourceId"]), to_node_id=int(link["targetId"]), type=link["type"])
+    def _linkOrLinkIdToQuery(self, link: Link):
+        return DBLink.objects.filter(from_node_id=int(link["sourceId"]), to_node_id=int(link["targetId"]))
 
     def _toDomainNode(self, dbNode: DBNode) -> Node:
         return Node.create({

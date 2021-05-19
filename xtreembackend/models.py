@@ -37,8 +37,15 @@ class Node(models.Model):
 class Link(models.Model):
     TYPE_CHOICES = (
         ("general", "general"),
+        ("topic", "topic"),
+        ("fact", "fact"),
         ("pro_arg", "pro_arg"),
         ("con_arg", "con_arg"),
+        ("question", "question"),
+        ("problem", "problem"),
+        ("idea", "idea"),
+        ("aim", "aim"),
+        ("region", "region"),
     )
 
     type = models.CharField(max_length=20, default="general", choices=TYPE_CHOICES)
@@ -49,5 +56,5 @@ class Link(models.Model):
 
     class Meta:
         db_table = "xtreembackend_node_x_link"
-        unique_together = ('type', 'to_node', 'from_node')
+        unique_together = ('to_node', 'from_node')
 

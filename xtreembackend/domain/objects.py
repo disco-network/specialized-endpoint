@@ -28,13 +28,26 @@ Node = AggregateDataType({
 
 LinkType = EnumDataType([
     "general",
+    "topic",
+    "fact",
     "pro_arg",
     "con_arg",
+    "question",
+    "problem",
+    "idea",
+    "aim",
+    "region",
 ])
 
-Link = AggregateDataType({
+LinkID = AggregateDataType({
     "sourceId": StringDataType,
     "targetId": StringDataType,
+}, lambda link: Result.success(None))
+
+# Link extends LinkID; the LinkID of a Link is unique.
+Link = AggregateDataType({
+    "sourceId": StringDataType, # ID of the parent
+    "targetId": StringDataType, # ID of the child
     "type": LinkType,
 }, lambda link: Result.success(None))
 

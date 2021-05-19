@@ -1,7 +1,7 @@
 from typing import List
 
 from .repositories import NodeRepository
-from .domain.objects import Node, NodeData, Link, LinkType
+from .domain.objects import LinkID, Node, NodeData, Link, LinkType
 from .domain.cache import Cache
 
 from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nullable, StringDataType
@@ -15,6 +15,10 @@ from .dataspecs import Result, AggregateDataType, IntDataType, ListDataType, Nul
 # (usually, as an AggregateDataType) and an `execute`
 # function that takes an instance of the `Command` and
 # the node repository (think: "database") it operates on.
+# 
+# Here is an article that might motivate this architecture
+# a posteriori:
+# https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/
 #
 
 GetNodesCommand = AggregateDataType({
@@ -77,6 +81,8 @@ def executeCreateNodeCommand(cmd, repository: NodeRepository) -> Node:
 
     return node
 
+ # Either creates a new link or updates the type
+ # of an existing one.
 LinkCommand = AggregateDataType({
     "links": ListDataType(Link),
 }, lambda data: Result.ensure([
@@ -88,17 +94,17 @@ def executeLinkCommand(cmd, repository: NodeRepository):
         repository.link(link)
 
 UnlinkCommand = AggregateDataType({
-    "links": ListDataType(Link),
+    "links": ListDataType(LinkID),
 }, lambda data: Result.ensure([
     (len(data["links"]) <= 100, "The number of links given must not be higher than 100."),
 ]))
 
 def executeUnlinkCommand(cmd, repository: NodeRepository):
-    for link in cmd["links"]:
-        repository.unlink(link)
+    for linkID in cmd["links"]:
+        repository.unlink(linkID)
 
 MoveCommand = AggregateDataType({
-    "oldLinks": ListDataType(Link),
+    "oldLinks": ListDataType(LinkID),
     "newLinks": ListDataType(Link),
 }, lambda data: Result.ensure([
     (len(data["oldLinks"]) + len(data["newLinks"]) <= 200, "The total number of links given must not be higher than 200."),
@@ -106,7 +112,7 @@ MoveCommand = AggregateDataType({
 
 def executeMoveCommand(cmd, repository: NodeRepository):
     unlinkCmd = UnlinkCommand.create({
-        "links": ListDataType(Link).serialize(cmd["oldLinks"]),
+        "links": ListDataType(LinkID).serialize(cmd["oldLinks"]),
     })
     linkCmd = LinkCommand.create({
         "links": ListDataType(Link).serialize(cmd["newLinks"]),
@@ -130,9 +136,6 @@ def executeUpdateNodeDataCommand(cmd, repository: NodeRepository):
         nodeData["title"] = cmd["title"].extract()
     if cmd["content"].hasValue():
         nodeData["content"] = cmd["content"].extract()
-
-    print("UpdateNodeData")
-    print(nodeData)
 
     # store the modified node data
     repository.update(cmd["id"], nodeData)
